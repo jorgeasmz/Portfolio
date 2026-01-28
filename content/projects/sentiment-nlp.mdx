@@ -1,0 +1,35 @@
+---
+title: "NLP Sentiment Analysis Service"
+summary: "A production-grade NLP microservice stack using DistilBERT for sentiment classification, featuring a FastAPI backend and Docker containerization."
+image: "/images/projects/nlp-sentiment-bg.png"
+techStack: ["Python", "FastAPI", "Hugging Face", "Streamlit", "Docker", "Pydantic"]
+demoUrl: "https://jorgeasmz-nlp-sentiment-analysis.streamlit.app/"
+repoUrl: "https://github.com/jorgeasmz/NLP-Sentiment-Analysis"
+date: "2024-05-20"
+---
+
+## The Vision
+
+Natural Language Processing (NLP) models are powerful, but often difficult to integrate into real-world applications. This project bridges that gap. It is not just an analysis script; it is a full-stack microservices architecture designed to serve state-of-the-art Transformer models via a standard REST API.
+
+## Technical Architecture
+
+The system is engineered for scalability and separation of concerns, mirroring how AI services are deployed in enterprise environments.
+
+### 1. The Core (Model Layer)
+At the heart of the system is a **DistilBERT** model (fine-tuned on the SST-2 dataset). I chose DistilBERT because it retains 97% of BERT's performance while being 40% lighter and 60% faster—crucial metrics for a real-time inference API. 
+
+I implemented a **Singleton Pattern** for the model loader. This ensures that the heavy model is loaded into memory only once when the server starts, rather than reloading for every user request, drastically reducing latency.
+
+### 2. The API Layer (FastAPI)
+The backend is built with **FastAPI**. It handles:
+*   **Validation:** Using **Pydantic** models to rigorously check incoming JSON payloads before they reach the model.
+*   **Routing:** Clean endpoint structure (`POST /predict`) that returns standardized JSON responses (`label` and `confidence score`).
+
+### 3. The Interface (Streamlit)
+
+To demonstrate the API's capabilities, I developed a simple **Streamlit** frontend. It provides a clean, interactive playground where users can type sentences and see the model's emotional analysis in real-time, visualizing confidence scores for positive and negative sentiments.
+
+## Deployment & DevOps
+
+The entire application is containerized using **Docker** and **Docker Compose**. This ensures that the complex dependency chain (PyTorch, Transformers, etc.) works identically on my local machine and the cloud server.

@@ -1,0 +1,38 @@
+---
+title: "Prophet Time-Series Dashboard"
+summary: "An interactive forecasting platform for financial and operational metrics, built with Meta's Prophet library and Plotly."
+image: "/images/projects/forecasting-bg.png"
+techStack: ["Python", "Prophet", "Streamlit", "Plotly", "pandas"]
+demoUrl: "https://jorgeasmz-dashboard-forecasting.streamlit.app/"
+repoUrl: "https://github.com/jorgeasmz/Dashboard-Forecasting"
+date: "2024-06-15"
+---
+
+## The Analytical Challenge
+
+Time-series forecasting is notoriously difficult to visualize and explain to stakeholders. Static reports often fail to capture the nuance of seasonality and trends. I built this dashboard to solve that problem: providing a "glass box" interface where users can interact with historical data and generate dynamic forecasts on the fly.
+
+## Technical Implementation
+
+The application is structured as a modular Python application.
+
+### 1. The Engine (Facebook Prophet)
+I utilized **Prophet** for the core forecasting engine. Unlike traditional ARIMA models, Prophet is particularly robust to missing data and shifts in the trend, and it handles outliers well. This makes it perfect for business applications where data is rarely pristine.
+
+### 2. Interactive Visualization (Plotly)
+Static charts were insufficient for this use case. I integrated **Plotly** to create interactive graphs that allow users to:
+*   Zoom into specific time periods (e.g., holiday seasons).
+*   Toggle specific forecast components (trend vs. weekly seasonality).
+*   Hover over data points to see precise values and confidence intervals.
+
+### 3. Data Processing Architecture
+The backend implements a clean separation of concerns:
+*   **`loader.py`**: Handles data ingestion with caching to ensure performance.
+*   **`forecasting.py`**: Wraps the Prophet model logic, abstracting the complexity of model fitting and dataframe preparation.
+*   **`processing.py`**: Standardizes date formats and handles missing values before they reach the model.
+
+## Key Features
+
+*   **Dynamic Horizon:** Users can adjust the prediction window (e.g., 30 days, 6 months) in real-time.
+*   **Component Analysis:** The dashboard separately visualizes the overall trend, weekly seasonality, and yearly seasonality, helping analysts understand *why* the model predicts what it does.
+*   **Automated Pipeline:** From raw CSV upload to visualized forecast in seconds.

@@ -1,0 +1,36 @@
+---
+title: "Bank Customer Churn Predictor"
+summary: "A production-oriented machine learning application that helps identify at-risk customers through behavioral analysis."
+image: "/images/projects/churn-bg.png"
+techStack: ["Python", "scikit-learn", "Streamlit", "pandas", "joblib"]
+demoUrl: "https://jorgeasmz-churn-prediction-app.streamlit.app/"
+repoUrl: "https://github.com/jorgeasmz/Churn-Prediction-App"
+date: "2024-03-10"
+---
+
+## The Business Challenge
+
+In the financial sector, customer retention is often more valuable than acquisition. However, identifying which customers are preparing to leave (churn) is a complex pattern recognition problem. I built this application to address this challenge by predicting customer churn based on behavioral data.
+
+## Technical Architecture
+
+The project is structured as a complete MLOps pipeline rather than a simple notebook experiment.
+
+### Data Processing & Model Logic
+The core of the system relies on a **Random Forest Classifier**. I chose this ensemble method for its distinct advantages in this context:
+*   **Handling Non-Linearity:** Customer behavior rarely follows a straight line.
+*   **Feature Importance:** It allows us to deduce *why* a customer might leave, not just *if* they will.
+
+The pipeline processes raw customer data—demographics, account balances, and product usage—transforming categorical inputs via **One-Hot Encoding** before feeding them into the model.
+
+### Interactive Interface
+A model is only as good as its accessibility. To bridge the gap between Python scripts and the end-user, I integrated **Streamlit**. 
+
+This creates a real-time prediction dashboard where a bank employee can input single customer profiles and receive immediate risk assessments without touching a line of code.
+
+## Key Outcomes
+
+The application successfully demonstrates the full lifecycle of a machine learning project:
+1.  **Ingestion:** Automated cleaning of the "Bank Customer Churn Modelling" dataset.
+2.  **Persistence:** Model serialization using `joblib` ensures that the API is stateful and efficient, loading pre-trained artifacts instantly.
+3.  **Deployment:** A container-ready frontend that decouples the user experience from the complex backend logic.

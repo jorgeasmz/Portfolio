@@ -1,0 +1,35 @@
+---
+title: "Credit Risk Assessment System"
+summary: "A microservice-based architecture for evaluating credit applicant risk, featuring a FastAPI inference engine and Streamlit UI."
+image: "/images/projects/credit-risk-bg.png"
+techStack: ["Python", "FastAPI", "scikit-learn", "Streamlit", "Docker", "pandas"]
+demoUrl: "https://jorgeasmz-credit-risk-assessment.streamlit.app/"
+repoUrl: "https://github.com/jorgeasmz/Credit-Risk-Assessment"
+date: "2024-04-10"
+---
+
+## The Business Context
+
+In lending, speed and accuracy are competing goals. Traditional credit scoring is often slow and opaque. I assessed this challenge by building a system that automates the risk evaluation process using the German Credit Dataset. The goal was to create a deployable solution that could demonstrate the usage of machine learning in real-world banking applications.
+
+## System Architecture
+
+Unlike a standalone script, this project mirrors a production microservices environment. I decoupled the logic into three distinct layers:
+
+### 1. Modeling Pipeline
+The foundation is a **Random Forest** classifier trained on demographic and financial history data. I implemented a robust `scikit-learn` pipeline that handles:
+*   **Data Ingestion:** Automated fetching from the UCI Machine Learning Repository.
+*   **Preprocessing:** One-hot encoding for categorical variables and scaling for numerical inputs.
+*   **Serialization:** Saving the trained state for high-performance inference.
+
+### 2. Inference API (FastAPI)
+The model is exposed via a **FastAPI** REST interface. This choice was deliberate: FastAPI provides automatic Swagger documentation and high-performance asynchronous execution, making it ideal for serving ML predictions as a service.
+
+### 3. Interactive Frontend
+To make the model usable by non-technical staff, I built a consumer-facing dashboard using **Streamlit**. It communicates with the backend via HTTP requests, maintaining a clean separation of concerns between the user interface and the business logic.
+
+## Key Outcomes
+
+*   **Microservices Design:** successfully demonstrated how to decouple ML models from user interfaces.
+*   **Documentation First:** The API is self-documenting, allowing for easy integration with other banking systems.
+*   **End-to-End Flow:** From raw CSV data to a deployed web application accessible via a public URL.

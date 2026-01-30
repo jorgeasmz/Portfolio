@@ -11,20 +11,8 @@ interface ResearchCarouselProps {
 }
 
 export function ResearchCarousel({ items }: ResearchCarouselProps) {
-  const [currentIndex, setCurrentIndex] = useState(0);
 
-  // We want to show 2 items at a time on desktop, 1 on mobile
-  // However, accurately determining screen size for 'items per page' in initial render is hard avoiding hydration mismatch.
-  // A safe way is to always assume a unified view or handle responsive via CSS, mainly.
-  // But logic "show next 2" implies paging.
-  
-  // Let's implement a "window" methodology.
-  // We'll increment index by 1 or 2. 
-  // For simplicity and smoother UX, let's increment by 1 (sliding window) but show 2 items in the view container.
-  
-  // Actually, user said "swipe to the right to show the next two". This suggests pagination of 2.
-  // But if there are 3 items, page 1 (0,1), page 2 (2). 
-  
+  const [currentIndex, setCurrentIndex] = useState(0);
   const itemsPerPage = 2;
   const maxIndex = Math.ceil(items.length / itemsPerPage) - 1;
   const currentPage = Math.floor(currentIndex / itemsPerPage);
@@ -41,7 +29,7 @@ export function ResearchCarousel({ items }: ResearchCarouselProps) {
     );
   };
 
-  // handlers for swipe
+  // Handlers for swipe
   const onDragEnd = (event: any, info: any) => {
     const threshold = 50;
     if (info.offset.x < -threshold) {
@@ -52,8 +40,6 @@ export function ResearchCarousel({ items }: ResearchCarouselProps) {
   };
 
   const visibleItems = items.slice(currentIndex, currentIndex + itemsPerPage);
-  
-  // If we are at the end and slice returns fewer than itemsPerPage (e.g. 1 item left), that is fine.
   
   return (
     <div className="relative w-full max-w-5xl mx-auto">

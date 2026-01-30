@@ -43,6 +43,7 @@ import { LucideIcon, Code2 } from "lucide-react";
 
 // Normalize keys to lowercase for easier matching
 const iconMap: Record<string, IconType | LucideIcon> = {
+  
   // Languages
   "python": SiPython,
   "php": SiPhp,

@@ -22,8 +22,7 @@ test("every project is listed, with the quantum one first", async ({ page }) => 
 test("a card opens its project page", async ({ page }) => {
   await page.goto("/projects");
 
-  // The whole card is an overlay link, and that is what a visitor actually
-  // clicks; the title link underneath it is there for keyboard and screen readers.
+  // The overlay link covers the card and is what a visitor actually clicks.
   await page.locator('a[href^="/projects/bb84-simulation"]').last().click();
 
   await expect(page).toHaveURL(/\/projects\/bb84-simulation/);

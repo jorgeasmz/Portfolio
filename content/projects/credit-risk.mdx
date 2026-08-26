@@ -1,6 +1,6 @@
 ---
 title: "Credit Risk Assessment System"
-summary: "A scoring API that explains every decision and keeps a record of all of them. The obvious model turned out to be worse than lending to nobody."
+summary: "A credit scoring API with per-field SHAP explanations, an auditable decision log in PostgreSQL and an outcome endpoint for measuring realised cost."
 image: "/images/projects/credit-risk-bg.png"
 techStack: ["Python", "FastAPI", "scikit-learn", "PostgreSQL", "Docker", "pandas"]
 demoUrl: "https://jorgeasmz-credit-risk-assessment.streamlit.app/"
@@ -10,17 +10,20 @@ featured: true
 order: 2
 ---
 
-## The model that did not ship
+## Dataset and cost structure
 
-The German Credit dataset comes with something most datasets lack: an explicit cost matrix.
-Approving someone who then defaults costs five times what turning away a good customer does.
+The German Credit dataset contains 1,000 applications described by 20 attributes, of which 30%
+are labelled bad credit. It defines a cost matrix: a false negative, meaning an approved
+applicant who defaults, costs five units; a false positive, meaning a rejected applicant who
+would have repaid, costs one.
 
-A Random Forest was the obvious first attempt, and it reached 0.735 accuracy. Assuming nobody
-ever defaults reaches 0.700, so on paper it was earning its keep.
+Expected cost under that matrix is the selection criterion used throughout the project. Two
+constant policies bound it on the held-out set: approving every applicant costs 300, rejecting
+every applicant costs 140.
 
-Priced with the cost matrix it scores 153. Rejecting every single applicant scores 140.
+## Model selection
 
-The model was worse than closing the lending desk, and the accuracy figure never hinted at it.
+Three estimators were evaluated on a stratified 80/20 split.
 
 | Model | Accuracy | ROC-AUC | PR-AUC | Recall | Cost |
 |---|---:|---:|---:|---:|---:|
@@ -28,24 +31,22 @@ The model was worse than closing the lending desk, and the accuracy figure never
 | Random Forest | 0.735 | 0.788 | 0.615 | 0.583 | 153 |
 | Majority class | 0.700 | 0.500 | 0.300 | 0.000 | 300 |
 
-Logistic regression beat it in every column. Less surprising than it looks: 800 training rows of
-mostly categorical data is not much for an ensemble to find structure in, and plenty for it to
-memorise. The forest stays in the codebase as `build_forest()`, since a choice that cannot be
-compared against anything is not really a choice.
+The Random Forest reaches 0.735 accuracy and an expected cost of 153, which exceeds the 140 of
+the reject-all policy. Accuracy does not separate the two. Logistic regression attains a lower
+expected cost and higher ranking quality under both ROC-AUC and PR-AUC on 800 training rows of
+predominantly categorical features, and was selected. The forest remains available as
+`build_forest()` so the comparison can be reproduced.
 
-## Where to draw the line
+## Decision threshold
 
-`predict()` cuts at 0.5. That is a default rather than a decision, and it assumes both mistakes
-cost the same.
+The default `predict()` classifies at a probability of 0.5, which corresponds to equal
+misclassification costs. Sweeping the threshold against the cost curve locates the minimum at
+**0.45**, with an expected cost of 96. Accuracy continues to increase above that value: the
+highest-accuracy threshold in the sweep carries an expected cost 25% higher.
 
-Sweeping the threshold against the cost curve puts the minimum at **0.45**, for a cost of 96.
-Accuracy keeps climbing well past that point. The most accurate threshold in the sweep costs a
-quarter more than the one the service uses.
+## Explanations
 
-## Explaining a decline
-
-When the answer is no, the applicant is owed a reason, and in several jurisdictions the lender
-is required to give one. Every response carries the contribution of each field:
+Each response reports the contribution of every input field to the log-odds of default.
 
 ```json
 {
@@ -60,64 +61,62 @@ is required to give one. Every response carries the contribution of each field:
 }
 ```
 
-Producing that took more care than it looks. SHAP runs on the matrix the model actually sees,
-where a categorical field spreads across one column per level, so the raw output is 61 numbers
-attached to labels like `checkin_acc_A11`. Folding them back onto the twenty fields on the form
-is what makes them mean anything.
+Contributions are computed with SHAP over the transformed design matrix, which holds 61 columns
+because each categorical field is one-hot encoded into one column per level. The values are then
+summed by originating field to produce one contribution per input.
 
-The mapping is built from the encoder's fitted categories rather than by parsing the generated
-column names, because `cat__checkin_acc_A11` cannot be split on underscores when the column name
-already contains one.
+The column-to-field mapping is derived from the encoder's fitted `categories_` rather than by
+parsing generated column names, since a name such as `cat__checkin_acc_A11` is not separable by
+underscore when the field name itself contains one.
 
-There is a second catch. SHAP subsamples its background by default, which would explain the same
-application two different ways on two different days. For a decision that might be challenged
-months later, that is unacceptable, so the masker is pinned to the full background instead. A
-test asserts the additivity property directly, since a mistake in the aggregation would break it.
+The SHAP masker is pinned to the full training background. The default behaviour subsamples it,
+which yields different explanations for identical inputs across calls. A test asserts the
+additivity property, base value plus contributions equal to the model log-odds, which fails if
+the aggregation is incorrect.
 
-## Keeping the receipts
+## Decision log
 
-Every scoring is written to PostgreSQL with the application, the explanation, the threshold in
-force and a content hash of the artifact that decided. Not a version number: two builds tagged
-`v1.2` are not necessarily the same model, and an audit needs the file.
+Each scoring is persisted to PostgreSQL with the submitted application, the computed
+contributions, the threshold in force and a SHA-256 content hash of the model artifact. The hash
+identifies the file rather than a release label, so a stored decision maps to the exact
+parameters that produced it.
 
-The log pages by seeking on the primary key rather than with `OFFSET`, which walks the rows it
-skips and shifts entries under anyone reading while new decisions arrive.
+The log is paginated by seeking on the primary key. Offset pagination scans the skipped rows and
+shifts entries between requests when new decisions are inserted concurrently.
 
-Cost cannot be measured from the log alone. Knowing whether a decision turned out expensive means
-knowing whether the applicant paid, so there is an endpoint for reporting that back:
+## Outcome feedback
+
+Realised cost requires ground truth, which is not available at scoring time. An endpoint records
+it once a loan resolves:
 
 ```
 POST /decisions/41/outcome   {"defaulted": true}
 ```
 
-`GET /summary` prices those outcomes with the same cost matrix that chose the model, and covers
-only the decisions that have one. It also returns the distribution of predicted probabilities,
-which is how the threshold becomes visible against the portfolio it is cutting. Until an outcome
-arrives, the service can report how many applicants it turned away but not whether it should have.
+`GET /summary` applies the cost matrix to the decisions that carry an outcome and reports over
+that subset only. It also returns the distribution of predicted probabilities across ten buckets,
+which positions the threshold relative to the scored portfolio.
 
-## Access
+## Access control
 
-Scoring and reading the log both sit behind a shared key in an `X-API-Key` header, compared in
-constant time. With no key configured the endpoints return 503 rather than opening up. A credit
-service that starts scoring for anyone because an environment variable went missing is a worse
-failure than one that stops.
+The scoring and log endpoints require a shared key supplied in an `X-API-Key` header and compared
+with a constant-time function. When no key is configured the endpoints return 503 rather than
+accepting unauthenticated requests. A single shared key covers service-to-service access; per
+client keys, rotation and rate limiting would be required for multiple consumers.
 
-A single key fits service-to-service access, which is what this is. Several consumers would need
-per-client keys and rotation, and that is a different design rather than a larger version of this
-one.
+## Deployment
 
-## Running in production
+The API runs as a Docker container on Render, PostgreSQL is hosted on Neon and the Streamlit
+client on Streamlit Cloud. Alembic migrations execute at container start rather than at image
+build, since the database is not reachable while the image is being built.
 
-The API runs as a Docker container on Render, with PostgreSQL on Neon and the Streamlit client on
-Streamlit Cloud. Migrations run at container start rather than at image build, because the
-database does not exist yet when the image is built.
-
-Both free tiers sleep when idle. A measured wake-up took 32 seconds, so the client waits 90 and
-says what is happening instead of showing a connection error.
+Both free tiers suspend on inactivity. A measured cold start returned the health check in 32
+seconds, and the client timeout is set to 90 seconds.
 
 ## Testing
 
-68 tests, 96% coverage. The suite never touches the network or a real database: it fits the
-pipeline on a small synthetic frame with the same schema and runs against a throwaway SQLite
-file. CI additionally applies the migrations to a real PostgreSQL service, which is where a
-dialect difference would otherwise turn up in production rather than in a pull request.
+The suite contains 68 tests at 96% statement coverage of the application and model packages.
+Tests fit the pipeline on a synthetic frame following the production schema and run against a
+temporary SQLite database, so neither network access nor an external database is required. CI
+additionally applies the migrations against a PostgreSQL service container to detect dialect
+differences before deployment.

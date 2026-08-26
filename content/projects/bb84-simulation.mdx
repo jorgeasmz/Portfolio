@@ -1,72 +1,87 @@
 ---
 title: "BB84 Quantum Key Distribution Simulator"
-summary: "An interactive simulation of the BB84 protocol with decoy states, showing how two parties detect an eavesdropper from the statistics of their own measurements."
+summary: "An interactive simulation of the BB84 protocol that runs it under an ideal channel, a noisy one and an active eavesdropper, and reads the difference off the error rate."
 image: "/images/projects/bb84-bg.png"
-techStack: ["Python", "Qiskit", "Streamlit", "NumPy", "Matplotlib"]
+techStack: ["Python", "Qiskit", "Streamlit"]
 demoUrl: "https://jorgeasmz-bb84-simulation.streamlit.app/"
 repoUrl: "https://github.com/jorgeasmz/BB84-Simulation"
-date: "2025-06-01"
+date: "2024-11-01"
 featured: true
 order: 1
 ---
 
-## Why Key Distribution Became a Physics Problem
+## Security From Physics, Not From Arithmetic
 
 Classical key exchange rests on computational hardness. RSA is safe because factoring large
-numbers is slow on the machines we have, which is a statement about engineering rather than a
-theorem. A sufficiently large quantum computer removes that assumption.
+numbers is slow on the machines we have, which is a claim about engineering rather than a
+theorem, and a sufficiently large quantum computer retires it.
 
-BB84 replaces it with a physical law. Its security does not depend on how much computing power
-an adversary owns; it depends on the fact that measuring an unknown quantum state disturbs it.
-An eavesdropper cannot listen without leaving evidence, and the protocol is built so the
-legitimate parties can measure exactly how much evidence there is.
+BB84 replaces that assumption with a physical constraint. Its guarantee does not depend on how
+much computing power an adversary owns; it depends on the fact that measuring an unknown quantum
+state disturbs it. An eavesdropper cannot listen silently, and the protocol is arranged so the
+legitimate parties can quantify how loud she was.
 
-## How the Protocol Works
+## Running the Protocol
 
-Alice encodes each bit in one of two **conjugate bases**, chosen at random: rectilinear or
-diagonal. Bob measures each incoming state, also picking his basis at random and independently.
+Alice generates random bits and, independently, picks a random basis for each one: rectilinear
+or diagonal. She encodes each bit in the basis she drew and sends the qubit onward.
 
-Neither knows the other's choices while the transmission happens. Afterwards they compare bases
-over a public channel and discard every position where they disagree, keeping roughly half the
-bits. This step is called **sifting**, and it is why the basis choices can be announced without
-weakening anything: the bit values are never revealed, only which basis was used.
+Bob measures each arrival in a basis he also picks at random, knowing nothing of Alice's choices.
+When he happens to match her basis, he recovers her bit exactly. When he does not, his outcome is
+random.
 
-The security comes from what happens when someone intercepts. An eavesdropper must also guess a
-basis, and half the time she guesses wrong. Measuring in the wrong basis collapses the state and
-randomises what Bob receives. The result is a measurable error rate on positions where Alice and
-Bob *did* agree, the **QBER**. Above a threshold, they abort. The channel does not need to be
-trusted; it needs to be characterised.
+Only afterwards do they compare bases over a public channel and discard every position where
+they disagree. This is **sifting**, and roughly half the transmission survives it. Announcing the
+bases costs nothing because the basis is not the secret: the bit value is, and it is never
+revealed.
 
-## The Problem With Real Hardware
+## Three Scenarios, One Measurement
 
-Textbook BB84 assumes a source that emits exactly one photon per pulse. Real sources are
-attenuated lasers, and their output follows a Poisson distribution: most pulses are empty, some
-carry one photon, and some carry more than one.
+The simulator runs the protocol under three conditions, and the point is what separates them:
 
-Multi-photon pulses are the vulnerability. An eavesdropper can split one photon off, keep it,
-and forward the rest untouched, learning part of the key without raising the error rate at all.
-This is the **photon-number-splitting attack**, and against it the plain protocol has no defence.
+**Ideal channel.** Alice and Bob's sifted keys agree completely. The error rate is zero, which is
+the reference every other run is read against.
 
-**Decoy states** close the gap. Alice varies the intensity of her pulses at random between a
-signal level and one or more weaker decoy levels. An eavesdropper cannot tell which is which, so
-any attack that selectively favours multi-photon pulses distorts the yields of the intensity
-classes differently. Comparing detection statistics across intensities exposes the attack even
-though no individual pulse reveals anything.
+**Noisy channel.** Physical imperfection flips some bits. The keys diverge slightly even though
+nobody is listening.
 
-## What the Simulator Shows
+**Eavesdropper present.** Eve intercepts each qubit, measures it and forwards a replacement. She
+faces the same problem Bob does: she must guess a basis. When she guesses wrong, which happens
+half the time, her measurement collapses the state into the wrong basis and the qubit she
+forwards carries no relation to Alice's bit. Bob then reads it correctly only half the time.
 
-The application runs the protocol end to end and exposes the parts that are normally invisible:
-basis choices, sifting, the resulting QBER, and how the yields of signal and decoy pulses
-diverge when an eavesdropper is introduced. Parameters are adjustable, so the effect of channel
-loss, intensity settings and interception strategy can be explored directly rather than read
-about.
+That gives intercept-resend a specific signature. Half of Eve's guesses are wrong, and half of
+those produce a wrong bit at Bob: an expected **25% error rate on the sifted key**, where an
+undisturbed channel would show none. The simulator computes exactly this **QBER** and surfaces it
+as the detection signal.
 
-Qiskit handles state preparation and measurement; Streamlit provides the interface, so the
-underlying quantum mechanics stays in Python and the exploration stays in the browser.
+## The Part That Makes It Interesting
+
+Noise and eavesdropping both raise the QBER, and the protocol cannot tell them apart.
+
+There is no measurement Alice and Bob can perform that says "this error came from a fibre
+imperfection, not from Eve". So the only safe reading is the pessimistic one: **attribute every
+error to an adversary**. Real deployments set a threshold, abort above it, and discard the key.
+This is why running the noisy scenario next to the eavesdropper scenario is instructive rather
+than decorative. It shows the ambiguity that any practical QKD system has to be engineered
+around.
+
+## What the Application Shows
+
+The interface walks the protocol stage by stage rather than reporting a final number: Alice's
+bits and bases, the prepared qubits, Bob's basis choices and measurements, and the classical
+post-processing that produces the sifted key. Alongside it are the statistics that make the run
+legible, including histograms of measured bits, the error rate and the degree of key agreement,
+plus an explanatory section covering the encoding and decoding of bits in quantum states.
+
+Qiskit handles state preparation and measurement, so the quantum mechanics stays honest rather
+than being emulated with coin flips; Streamlit keeps the exploration in the browser.
 
 ## Research Context
 
-This simulator supports the thesis *Use of Decoy States as a Method for Increasing Security in a
-Quantum Key Distribution Protocol*, which paired these simulations with a physical optical
-experiment at CIBioFI, Universidad del Valle. The work received a Special Mention for
-Outstanding Oral Presentation at the 2nd International Nano & Quantum Workshop (QTECNOS 2024).
+This simulator sits alongside separate academic work on quantum key distribution at CIBioFI,
+Universidad del Valle: a study of vacuum and weak decoy states as a countermeasure against
+photon-number-splitting attacks, combining Qiskit simulations with a physical optical experiment.
+That work is documented in the thesis and received a Special Mention for Outstanding Oral
+Presentation at the 2nd International Nano & Quantum Workshop (QTECNOS 2024). This repository is
+the interactive, teaching-oriented counterpart, and implements the standard protocol.

@@ -1,0 +1,72 @@
+---
+title: "BB84 Quantum Key Distribution Simulator"
+summary: "An interactive simulation of the BB84 protocol with decoy states, showing how two parties detect an eavesdropper from the statistics of their own measurements."
+image: "/images/projects/bb84-bg.png"
+techStack: ["Python", "Qiskit", "Streamlit", "NumPy", "Matplotlib"]
+demoUrl: "https://jorgeasmz-bb84-simulation.streamlit.app/"
+repoUrl: "https://github.com/jorgeasmz/BB84-Simulation"
+date: "2025-06-01"
+featured: true
+order: 1
+---
+
+## Why Key Distribution Became a Physics Problem
+
+Classical key exchange rests on computational hardness. RSA is safe because factoring large
+numbers is slow on the machines we have, which is a statement about engineering rather than a
+theorem. A sufficiently large quantum computer removes that assumption.
+
+BB84 replaces it with a physical law. Its security does not depend on how much computing power
+an adversary owns; it depends on the fact that measuring an unknown quantum state disturbs it.
+An eavesdropper cannot listen without leaving evidence, and the protocol is built so the
+legitimate parties can measure exactly how much evidence there is.
+
+## How the Protocol Works
+
+Alice encodes each bit in one of two **conjugate bases**, chosen at random: rectilinear or
+diagonal. Bob measures each incoming state, also picking his basis at random and independently.
+
+Neither knows the other's choices while the transmission happens. Afterwards they compare bases
+over a public channel and discard every position where they disagree, keeping roughly half the
+bits. This step is called **sifting**, and it is why the basis choices can be announced without
+weakening anything: the bit values are never revealed, only which basis was used.
+
+The security comes from what happens when someone intercepts. An eavesdropper must also guess a
+basis, and half the time she guesses wrong. Measuring in the wrong basis collapses the state and
+randomises what Bob receives. The result is a measurable error rate on positions where Alice and
+Bob *did* agree, the **QBER**. Above a threshold, they abort. The channel does not need to be
+trusted; it needs to be characterised.
+
+## The Problem With Real Hardware
+
+Textbook BB84 assumes a source that emits exactly one photon per pulse. Real sources are
+attenuated lasers, and their output follows a Poisson distribution: most pulses are empty, some
+carry one photon, and some carry more than one.
+
+Multi-photon pulses are the vulnerability. An eavesdropper can split one photon off, keep it,
+and forward the rest untouched, learning part of the key without raising the error rate at all.
+This is the **photon-number-splitting attack**, and against it the plain protocol has no defence.
+
+**Decoy states** close the gap. Alice varies the intensity of her pulses at random between a
+signal level and one or more weaker decoy levels. An eavesdropper cannot tell which is which, so
+any attack that selectively favours multi-photon pulses distorts the yields of the intensity
+classes differently. Comparing detection statistics across intensities exposes the attack even
+though no individual pulse reveals anything.
+
+## What the Simulator Shows
+
+The application runs the protocol end to end and exposes the parts that are normally invisible:
+basis choices, sifting, the resulting QBER, and how the yields of signal and decoy pulses
+diverge when an eavesdropper is introduced. Parameters are adjustable, so the effect of channel
+loss, intensity settings and interception strategy can be explored directly rather than read
+about.
+
+Qiskit handles state preparation and measurement; Streamlit provides the interface, so the
+underlying quantum mechanics stays in Python and the exploration stays in the browser.
+
+## Research Context
+
+This simulator supports the thesis *Use of Decoy States as a Method for Increasing Security in a
+Quantum Key Distribution Protocol*, which paired these simulations with a physical optical
+experiment at CIBioFI, Universidad del Valle. The work received a Special Mention for
+Outstanding Oral Presentation at the 2nd International Nano & Quantum Workshop (QTECNOS 2024).

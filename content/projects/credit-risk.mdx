@@ -1,35 +1,65 @@
 ---
 title: "Credit Risk Assessment System"
-summary: "A microservice-based architecture for evaluating credit applicant risk, featuring a FastAPI inference engine and Streamlit UI."
+summary: "A credit scoring service where the model was chosen by expected cost rather than accuracy, after the obvious candidate turned out to be worse than rejecting every applicant."
 image: "/images/projects/credit-risk-bg.png"
 techStack: ["Python", "FastAPI", "scikit-learn", "Streamlit", "Docker", "pandas"]
 demoUrl: "https://jorgeasmz-credit-risk-assessment.streamlit.app/"
 repoUrl: "https://github.com/jorgeasmz/Credit-Risk-Assessment"
 date: "2024-04-10"
+featured: true
+order: 2
 ---
 
-## The Business Context
+## The Metric That Nearly Hid a Failure
 
-In lending, speed and accuracy are competing goals. Traditional credit scoring is often slow and opaque. I assessed this challenge by building a system that automates the risk evaluation process using the German Credit Dataset. The goal was to create a deployable solution that could demonstrate the usage of machine learning in real-world banking applications.
+The German Credit dataset ships something most datasets do not: an explicit cost matrix.
+Approving an applicant who defaults costs five times what rejecting a creditworthy one does.
+That asymmetry is the whole problem, and accuracy is blind to it.
 
-## System Architecture
+I built the obvious model first, a Random Forest, and it scored **0.735 accuracy** on a held-out
+stratified split. That looks reasonable next to the 0.700 you get by predicting that nobody
+defaults. Under the cost matrix it scores **153**, and rejecting every single applicant scores
+**140**.
 
-Unlike a standalone script, this project mirrors a production microservices environment. I decoupled the logic into three distinct layers:
+The model was worse than refusing to lend at all, and the accuracy figure gave no hint of it.
 
-### 1. Modeling Pipeline
-The foundation is a **Random Forest** classifier trained on demographic and financial history data. I implemented a robust `scikit-learn` pipeline that handles:
-*   **Data Ingestion:** Automated fetching from the UCI Machine Learning Repository.
-*   **Preprocessing:** One-hot encoding for categorical variables and scaling for numerical inputs.
-*   **Serialization:** Saving the trained state for high-performance inference.
+## Choosing by Cost
 
-### 2. Inference API (FastAPI)
-The model is exposed via a **FastAPI** REST interface. This choice was deliberate: FastAPI provides automatic Swagger documentation and high-performance asynchronous execution, making it ideal for serving ML predictions as a service.
+Evaluated properly, against baselines and on the metric the domain actually cares about:
 
-### 3. Interactive Frontend
-To make the model usable by non-technical staff, I built a consumer-facing dashboard using **Streamlit**. It communicates with the backend via HTTP requests, maintaining a clean separation of concerns between the user interface and the business logic.
+| Model | Accuracy | ROC-AUC | PR-AUC | Recall | Cost |
+|---|---|---|---|---|---|
+| **Logistic Regression** | 0.750 | **0.806** | **0.633** | 0.800 | **98** |
+| Random Forest | 0.735 | 0.788 | 0.615 | 0.583 | 153 |
+| Majority class | 0.700 | 0.500 | 0.300 | 0.000 | 300 |
 
-## Key Outcomes
+The linear model wins on every measure. On 800 training rows of mostly categorical data that is
+not surprising: there is not enough signal for an ensemble to exploit, and there is plenty for it
+to overfit. Its coefficients also carry a practical advantage that a forest cannot match, since a
+declined application has to be explainable.
 
-*   **Microservices Design:** successfully demonstrated how to decouple ML models from user interfaces.
-*   **Documentation First:** The API is self-documenting, allowing for easy integration with other banking systems.
-*   **End-to-End Flow:** From raw CSV data to a deployed web application accessible via a public URL.
+## The Threshold Is a Decision, Not a Default
+
+`predict()` cuts at 0.5, which silently assumes both kinds of error cost the same. Sweeping the
+threshold against the cost curve moves the optimum to **0.45**, bringing expected cost down to
+**96**. Past that point accuracy keeps rising while cost gets worse: the most accurate threshold
+in the sweep costs 25% more than the chosen one.
+
+## Architecture
+
+Preprocessing and classifier live inside a single scikit-learn `Pipeline`. That is a deliberate
+choice rather than a stylistic one: imputation, scaling and one-hot encoding are fitted as part
+of the estimator, so the API accepts raw application fields and there is no second implementation
+of the transformations that could drift out of sync with training.
+
+The service runs as a **FastAPI** container on Render, declared in a `render.yaml` blueprint,
+with a **Streamlit** client on Streamlit Cloud reaching it over HTTP. The two halves are joined
+by a single environment variable, which is what lets them be deployed and scaled independently.
+
+## Engineering Notes
+
+The repository carries 23 tests at 97% coverage, a CI workflow running lint and tests, and pinned
+dependencies. Two of those tests exist because of specific defects found while building it: the
+OpenAPI example never reached Swagger because of a typo in the schema config, and a Compose
+volume was hiding the model the image had trained, leaving a fresh clone answering 503 to every
+request.

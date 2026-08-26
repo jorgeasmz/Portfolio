@@ -1,38 +1,58 @@
 ---
-title: "Prophet Time-Series Dashboard"
-summary: "An interactive forecasting platform for financial and operational metrics, built with Meta's Prophet library and Plotly."
+title: "Time-Series Forecasting Dashboard"
+summary: "A Prophet forecasting service benchmarked against naive baselines, where writing the first test uncovered a chart that had been broken in production."
 image: "/images/projects/forecasting-bg.png"
-techStack: ["Python", "Prophet", "Streamlit", "Plotly", "pandas"]
+techStack: ["Python", "Prophet", "Plotly", "Streamlit", "pandas"]
 demoUrl: "https://jorgeasmz-dashboard-forecasting.streamlit.app/"
 repoUrl: "https://github.com/jorgeasmz/Dashboard-Forecasting"
 date: "2024-06-15"
+order: 4
 ---
 
-## The Analytical Challenge
+## A Forecast Is Only Worth Its Baseline
 
-Time-series forecasting is notoriously difficult to visualize and explain to stakeholders. Static reports often fail to capture the nuance of seasonality and trends. I built this dashboard to solve that problem: providing a "glass box" interface where users can interact with historical data and generate dynamic forecasts on the fly.
+Any model produces a line on a chart. The question is whether that line beats the cheapest
+possible alternative, and for a seasonal series the cheapest alternative is not "repeat the last
+value" but "repeat what happened this month last year".
 
-## Technical Implementation
+Backtested on monthly car sales with the final twelve months held out:
 
-The application is structured as a modular Python application.
+| Model | MAPE | MAE | RMSE |
+|---|---|---|---|
+| **Prophet** | **7.19%** | **1336.8** | **1749.2** |
+| Seasonal naive (t−12) | 10.83% | 1959.5 | 2290.8 |
+| Naive (last value) | 22.27% | 4599.0 | 5865.4 |
 
-### 1. The Engine (Facebook Prophet)
-I utilized **Prophet** for the core forecasting engine. Unlike traditional ARIMA models, Prophet is particularly robust to missing data and shifts in the trend, and it handles outliers well. This makes it perfect for business applications where data is rarely pristine.
+Prophet cuts the error of the seasonal baseline by a third. Beating the last-value baseline would
+have proved nothing on a series with this much annual structure; the seasonal one is the bar that
+had to be cleared.
 
-### 2. Interactive Visualization (Plotly)
-Static charts were insufficient for this use case. I integrated **Plotly** to create interactive graphs that allow users to:
-*   Zoom into specific time periods (e.g., holiday seasons).
-*   Toggle specific forecast components (trend vs. weekly seasonality).
-*   Hover over data points to see precise values and confidence intervals.
+## The Test That Found a Live Bug
 
-### 3. Data Processing Architecture
-The backend implements a clean separation of concerns:
-*   **`loader.py`**: Handles data ingestion with caching to ensure performance.
-*   **`forecasting.py`**: Wraps the Prophet model logic, abstracting the complexity of model fitting and dataframe preparation.
-*   **`processing.py`**: Standardizes date formats and handles missing values before they reach the model.
+The chart on the deployed app had been broken, and nobody had noticed because the failure only
+triggers after training completes.
 
-## Key Features
+Prophet's own Plotly helper runs `assert m.history` on a pandas DataFrame. Pandas refuses to
+evaluate a DataFrame's truthiness and raises `ValueError` instead, so the assertion fails for
+every fitted model, which is the only kind you would ever plot. The intent was clearly to check
+that the model had been trained; the effect was the opposite.
 
-*   **Dynamic Horizon:** Users can adjust the prediction window (e.g., 30 days, 6 months) in real-time.
-*   **Component Analysis:** The dashboard separately visualizes the overall trend, weekly seasonality, and yearly seasonality, helping analysts understand *why* the model predicts what it does.
-*   **Automated Pipeline:** From raw CSV upload to visualized forecast in seconds.
+The figure is now built directly with `graph_objects`: observed points, the prediction line and
+the uncertainty band as a filled region. That removed the dependency on a broken helper and made
+the chart consistent with the rest of the visualisations.
+
+The test that caught it was a smoke test I nearly skipped writing, on the grounds that plotting
+code is not worth covering.
+
+## Architecture
+
+Each stage is a module with a single responsibility, and data access is split in two: a pure
+function that reads and raises, and a cached Streamlit wrapper that catches and degrades to an
+empty frame. The application needs to show a warning rather than a traceback; the tests need a
+failure to be observable. One function cannot do both.
+
+## Engineering Notes
+
+13 tests at 100% coverage of the application modules, with the Prophet-fitting ones marked slow
+so the fast suite stays under a second. The evaluation itself is a committed script rather than
+a number typed into a README, so the table above can be regenerated on demand.

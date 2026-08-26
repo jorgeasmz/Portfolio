@@ -1,36 +1,61 @@
 ---
 title: "Bank Customer Churn Predictor"
-summary: "A production-oriented machine learning application that helps identify at-risk customers through behavioral analysis."
+summary: "A churn classifier where capping tree depth made the model both eight times smaller and measurably better, and where the useful metric was never accuracy."
 image: "/images/projects/churn-bg.png"
-techStack: ["Python", "scikit-learn", "Streamlit", "pandas", "joblib"]
+techStack: ["Python", "scikit-learn", "Streamlit", "pandas", "NumPy"]
 demoUrl: "https://jorgeasmz-churn-prediction-app.streamlit.app/"
 repoUrl: "https://github.com/jorgeasmz/Churn-Prediction-App"
 date: "2024-03-10"
+order: 5
 ---
 
-## The Business Challenge
+## Accuracy Says Almost Nothing Here
 
-In the financial sector, customer retention is often more valuable than acquisition. However, identifying which customers are preparing to leave (churn) is a complex pattern recognition problem. I built this application to address this challenge by predicting customer churn based on behavioral data.
+Roughly 20% of the customers in this dataset churn. A model that predicts nobody ever leaves is
+therefore right 79.6% of the time while being entirely useless, and the trained Random Forest
+reaches 86.9%. Seven points of separation is the entire distance between the model and doing
+nothing.
 
-## Technical Architecture
+Recall on the positive class is the number that matters. At the default 0.5 threshold the model
+catches 44% of the customers who actually leave. A customer who is never flagged can never be
+retained, so more than half the opportunity is lost before anyone reads the output.
 
-The project is structured as a complete MLOps pipeline rather than a simple notebook experiment.
+Sweeping the threshold against F1 moves the operating point to **0.30**, lifting detection to
+62% at the cost of a longer list to work through. That trade is a business decision, and the
+point of surfacing it is that 0.5 was never a decision at all.
 
-### Data Processing & Model Logic
-The core of the system relies on a **Random Forest Classifier**. I chose this ensemble method for its distinct advantages in this context:
-*   **Handling Non-Linearity:** Customer behavior rarely follows a straight line.
-*   **Feature Importance:** It allows us to deduce *why* a customer might leave, not just *if* they will.
+## Smaller and Better at the Same Time
 
-The pipeline processes raw customer data—demographics, account balances, and product usage—transforming categorical inputs via **One-Hot Encoding** before feeding them into the model.
+The forest was originally left unbounded, growing each tree until its leaves were pure. Measuring
+depth against both quality and size:
 
-### Interactive Interface
-A model is only as good as its accessibility. To bridge the gap between Python scripts and the end-user, I integrated **Streamlit**. 
+| max_depth | ROC-AUC | PR-AUC | Artifact |
+|---|---|---|---|
+| None | 0.854 | 0.681 | 16.9 MB |
+| 12 | 0.860 | 0.703 | 8.0 MB |
+| **8** | **0.866** | **0.712** | **2.0 MB** |
+| 6 | 0.861 | 0.702 | 0.8 MB |
 
-This creates a real-time prediction dashboard where a bank employee can input single customer profiles and receive immediate risk assessments without touching a line of code.
+Capping depth at 8 improves ranking quality *and* shrinks the artifact by a factor of eight.
+Unbounded trees were memorising the noise in 8,000 training rows, which is what regularisation
+exists to prevent. The size mattered too: the artifact is versioned in git, so every retrain was
+leaving another 17 MB in the history permanently.
 
-## Key Outcomes
+## The Bug That Version Drift Exposed
 
-The application successfully demonstrates the full lifecycle of a machine learning project:
-1.  **Ingestion:** Automated cleaning of the "Bank Customer Churn Modelling" dataset.
-2.  **Persistence:** Model serialization using `joblib` ensures that the API is stateful and efficient, loading pre-trained artifacts instantly.
-3.  **Deployment:** A container-ready frontend that decouples the user experience from the complex backend logic.
+Encoding gender used to be guarded by `if df['Gender'].dtype == 'object'`. Under pandas 3 text
+columns use a dedicated string dtype, so that check silently stopped matching, the mapping never
+ran, and raw strings reached the estimator. Training failed outright with
+`could not convert string to float: 'Male'`.
+
+The serialized model had the same class of problem from the other direction: written by
+scikit-learn 1.8 and loaded by 1.9, a combination the library explicitly warns can produce
+invalid results without failing. Both trace back to the same root cause, which is unpinned
+dependencies around a binary artifact.
+
+## Architecture
+
+The application reads its feature order from `model.feature_names_in_` rather than a hardcoded
+list. A constant would let a retrained model and the input form drift apart silently, since
+scikit-learn will happily predict on misaligned columns without raising, and the encoder that
+builds a request raises if the model asks for a feature it cannot construct.

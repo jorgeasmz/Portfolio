@@ -4,6 +4,7 @@ import { useState } from "react";
 import { ResearchCard, ResearchItem } from "./ResearchCard";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import type { PanInfo } from "framer-motion";
 import { cn } from "@/lib/utils";
 
 interface ResearchCarouselProps {
@@ -30,7 +31,10 @@ export function ResearchCarousel({ items }: ResearchCarouselProps) {
   };
 
   // Handlers for swipe
-  const onDragEnd = (event: any, info: any) => {
+  const onDragEnd = (
+    _event: MouseEvent | TouchEvent | PointerEvent,
+    info: PanInfo
+  ) => {
     const threshold = 50;
     if (info.offset.x < -threshold) {
       next();

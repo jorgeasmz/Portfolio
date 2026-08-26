@@ -1,5 +1,8 @@
 import Link from "next/link";
-import { SiGithub, SiLinkedin } from "react-icons/si";
+import { SiGithub } from "react-icons/si";
+// Simple Icons dropped the LinkedIn mark, so react-icons no longer ships
+// SiLinkedin. Font Awesome still carries it.
+import { FaLinkedin } from "react-icons/fa";
 
 export function Footer() {
   return (
@@ -32,7 +35,7 @@ export function Footer() {
               <SiGithub className="h-5 w-5" />
            </Link>
            <Link href="https://www.linkedin.com/in/jorgeasmz/" target="_blank" className="text-muted-foreground hover:text-foreground transition-colors">
-              <SiLinkedin className="h-5 w-5" />
+              <FaLinkedin className="h-5 w-5" />
            </Link>
         </div>
       </div>

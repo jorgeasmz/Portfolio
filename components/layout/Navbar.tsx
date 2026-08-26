@@ -2,7 +2,10 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { SiGithub, SiLinkedin } from "react-icons/si";
+import { SiGithub } from "react-icons/si";
+// Simple Icons dropped the LinkedIn mark, so react-icons no longer ships
+// SiLinkedin. Font Awesome still carries it.
+import { FaLinkedin } from "react-icons/fa";
 import { Mail, Menu, X } from "lucide-react";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
 import { useState } from "react";
@@ -62,7 +65,7 @@ export function Navbar() {
                 rel="noreferrer"
                 className="text-foreground/60 hover:text-foreground transition-colors"
                 >
-                <SiLinkedin className="h-5 w-5" />
+                <FaLinkedin className="h-5 w-5" />
                 <span className="sr-only">LinkedIn</span>
                 </Link>
                 <Link
@@ -124,7 +127,7 @@ export function Navbar() {
                     target="_blank"
                     className="text-foreground/60 hover:text-foreground transition-colors"
                     >
-                    <SiLinkedin className="h-5 w-5" />
+                    <FaLinkedin className="h-5 w-5" />
                     </Link>
                     <Link
                     href="mailto:jorgeeasmz@gmail.com" 

@@ -12,7 +12,7 @@ export default defineConfig({
   use: { baseURL, trace: "on-first-retry" },
   projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
   webServer: {
-    // The production build is what gets deployed, so that is what is tested.
+    // The production build is what ships, so that is what gets tested.
     command: "npm run build && npm run start",
     url: baseURL,
     reuseExistingServer: !process.env.CI,

@@ -3,13 +3,7 @@ import path from "path";
 import matter from "gray-matter";
 import { z } from "zod";
 
-/**
- * Front matter contract for content/projects/*.mdx.
- *
- * Parsing rather than casting: a missing or misspelled field used to surface as
- * `undefined` rendered into the page, which is a defect you only notice by
- * looking. Now it fails the build and names the file.
- */
+// Parsed rather than cast, so a misspelled field fails the build instead of rendering as "undefined".
 const projectSchema = z.object({
   title: z.string().min(1),
   summary: z.string().min(1),

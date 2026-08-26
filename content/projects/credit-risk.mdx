@@ -1,8 +1,8 @@
 ---
 title: "Credit Risk Assessment System"
-summary: "A credit scoring service where the model was chosen by expected cost rather than accuracy, after the obvious candidate turned out to be worse than rejecting every applicant."
+summary: "A scoring API that explains every decision and keeps a record of all of them. The obvious model turned out to be worse than lending to nobody."
 image: "/images/projects/credit-risk-bg.png"
-techStack: ["Python", "FastAPI", "scikit-learn", "Streamlit", "Docker", "pandas"]
+techStack: ["Python", "FastAPI", "scikit-learn", "PostgreSQL", "Docker", "pandas"]
 demoUrl: "https://jorgeasmz-credit-risk-assessment.streamlit.app/"
 repoUrl: "https://github.com/jorgeasmz/Credit-Risk-Assessment"
 date: "2024-04-10"
@@ -10,56 +10,114 @@ featured: true
 order: 2
 ---
 
-## The Metric That Nearly Hid a Failure
+## The model that did not ship
 
-The German Credit dataset ships something most datasets do not: an explicit cost matrix.
-Approving an applicant who defaults costs five times what rejecting a creditworthy one does.
-That asymmetry is the whole problem, and accuracy is blind to it.
+The German Credit dataset comes with something most datasets lack: an explicit cost matrix.
+Approving someone who then defaults costs five times what turning away a good customer does.
 
-I built the obvious model first, a Random Forest, and it scored **0.735 accuracy** on a held-out
-stratified split. That looks reasonable next to the 0.700 you get by predicting that nobody
-defaults. Under the cost matrix it scores **153**, and rejecting every single applicant scores
-**140**.
+A Random Forest was the obvious first attempt, and it reached 0.735 accuracy. Assuming nobody
+ever defaults reaches 0.700, so on paper it was earning its keep.
 
-The model was worse than refusing to lend at all, and the accuracy figure gave no hint of it.
+Priced with the cost matrix it scores 153. Rejecting every single applicant scores 140.
 
-## Choosing by Cost
-
-Evaluated properly, against baselines and on the metric the domain actually cares about:
+The model was worse than closing the lending desk, and the accuracy figure never hinted at it.
 
 | Model | Accuracy | ROC-AUC | PR-AUC | Recall | Cost |
-|---|---|---|---|---|---|
+|---|---:|---:|---:|---:|---:|
 | **Logistic Regression** | 0.750 | **0.806** | **0.633** | 0.800 | **98** |
 | Random Forest | 0.735 | 0.788 | 0.615 | 0.583 | 153 |
 | Majority class | 0.700 | 0.500 | 0.300 | 0.000 | 300 |
 
-The linear model wins on every measure. On 800 training rows of mostly categorical data that is
-not surprising: there is not enough signal for an ensemble to exploit, and there is plenty for it
-to overfit. Its coefficients also carry a practical advantage that a forest cannot match, since a
-declined application has to be explainable.
+Logistic regression beat it in every column. Less surprising than it looks: 800 training rows of
+mostly categorical data is not much for an ensemble to find structure in, and plenty for it to
+memorise. The forest stays in the codebase as `build_forest()`, since a choice that cannot be
+compared against anything is not really a choice.
 
-## The Threshold Is a Decision, Not a Default
+## Where to draw the line
 
-`predict()` cuts at 0.5, which silently assumes both kinds of error cost the same. Sweeping the
-threshold against the cost curve moves the optimum to **0.45**, bringing expected cost down to
-**96**. Past that point accuracy keeps rising while cost gets worse: the most accurate threshold
-in the sweep costs 25% more than the chosen one.
+`predict()` cuts at 0.5. That is a default rather than a decision, and it assumes both mistakes
+cost the same.
 
-## Architecture
+Sweeping the threshold against the cost curve puts the minimum at **0.45**, for a cost of 96.
+Accuracy keeps climbing well past that point. The most accurate threshold in the sweep costs a
+quarter more than the one the service uses.
 
-Preprocessing and classifier live inside a single scikit-learn `Pipeline`. That is a deliberate
-choice rather than a stylistic one: imputation, scaling and one-hot encoding are fitted as part
-of the estimator, so the API accepts raw application fields and there is no second implementation
-of the transformations that could drift out of sync with training.
+## Explaining a decline
 
-The service runs as a **FastAPI** container on Render, declared in a `render.yaml` blueprint,
-with a **Streamlit** client on Streamlit Cloud reaching it over HTTP. The two halves are joined
-by a single environment variable, which is what lets them be deployed and scaled independently.
+When the answer is no, the applicant is owed a reason, and in several jurisdictions the lender
+is required to give one. Every response carries the contribution of each field:
 
-## Engineering Notes
+```json
+{
+  "risk_class": 0,
+  "probability": 0.081,
+  "model_version": "4d17fdeb3b1d",
+  "contributions": {
+    "checkin_acc": 0.7749,
+    "savings_acc": -0.6333,
+    "credit_history": -0.6052
+  }
+}
+```
 
-The repository carries 23 tests at 97% coverage, a CI workflow running lint and tests, and pinned
-dependencies. Two of those tests exist because of specific defects found while building it: the
-OpenAPI example never reached Swagger because of a typo in the schema config, and a Compose
-volume was hiding the model the image had trained, leaving a fresh clone answering 503 to every
-request.
+Producing that took more care than it looks. SHAP runs on the matrix the model actually sees,
+where a categorical field spreads across one column per level, so the raw output is 61 numbers
+attached to labels like `checkin_acc_A11`. Folding them back onto the twenty fields on the form
+is what makes them mean anything.
+
+The mapping is built from the encoder's fitted categories rather than by parsing the generated
+column names, because `cat__checkin_acc_A11` cannot be split on underscores when the column name
+already contains one.
+
+There is a second catch. SHAP subsamples its background by default, which would explain the same
+application two different ways on two different days. For a decision that might be challenged
+months later, that is unacceptable, so the masker is pinned to the full background instead. A
+test asserts the additivity property directly, since a mistake in the aggregation would break it.
+
+## Keeping the receipts
+
+Every scoring is written to PostgreSQL with the application, the explanation, the threshold in
+force and a content hash of the artifact that decided. Not a version number: two builds tagged
+`v1.2` are not necessarily the same model, and an audit needs the file.
+
+The log pages by seeking on the primary key rather than with `OFFSET`, which walks the rows it
+skips and shifts entries under anyone reading while new decisions arrive.
+
+Cost cannot be measured from the log alone. Knowing whether a decision turned out expensive means
+knowing whether the applicant paid, so there is an endpoint for reporting that back:
+
+```
+POST /decisions/41/outcome   {"defaulted": true}
+```
+
+`GET /summary` prices those outcomes with the same cost matrix that chose the model, and covers
+only the decisions that have one. It also returns the distribution of predicted probabilities,
+which is how the threshold becomes visible against the portfolio it is cutting. Until an outcome
+arrives, the service can report how many applicants it turned away but not whether it should have.
+
+## Access
+
+Scoring and reading the log both sit behind a shared key in an `X-API-Key` header, compared in
+constant time. With no key configured the endpoints return 503 rather than opening up. A credit
+service that starts scoring for anyone because an environment variable went missing is a worse
+failure than one that stops.
+
+A single key fits service-to-service access, which is what this is. Several consumers would need
+per-client keys and rotation, and that is a different design rather than a larger version of this
+one.
+
+## Running in production
+
+The API runs as a Docker container on Render, with PostgreSQL on Neon and the Streamlit client on
+Streamlit Cloud. Migrations run at container start rather than at image build, because the
+database does not exist yet when the image is built.
+
+Both free tiers sleep when idle. A measured wake-up took 32 seconds, so the client waits 90 and
+says what is happening instead of showing a connection error.
+
+## Testing
+
+68 tests, 96% coverage. The suite never touches the network or a real database: it fits the
+pipeline on a small synthetic frame with the same schema and runs against a throwaway SQLite
+file. CI additionally applies the migrations to a real PostgreSQL service, which is where a
+dialect difference would otherwise turn up in production rather than in a pull request.

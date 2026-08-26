@@ -10,8 +10,7 @@ export async function generateStaticParams() {
   return getProjectSlugs().map((slug) => ({ slug }));
 }
 
-// Every project is known at build time. Without this, an unknown slug reaches
-// the loader and fails with a 500 instead of rendering the 404 page.
+// Every project is known at build time; without this an unknown slug 500s instead of 404ing.
 export const dynamicParams = false;
 
 type Props = {

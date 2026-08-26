@@ -77,11 +77,14 @@ export function ProjectCard({ project, from }: ProjectCardProps) {
         </div>
       </div>
       
-      {/* Full card clickable link layer */}
-      <Link 
-        href={href} 
+      {/* Full-card click target. It duplicates the title link, so it is kept out
+          of the accessibility tree and out of the tab order: an aria-hidden
+          element must never contain something focusable. */}
+      <Link
+        href={href}
         className="absolute inset-0 z-10"
         aria-hidden="true"
+        tabIndex={-1}
       />
     </div>
   );

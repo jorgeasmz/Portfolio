@@ -1,18 +1,18 @@
 import { getProjectBySlug, getProjectSlugs } from "@/lib/mdx";
 import { MDXRemote } from "next-mdx-remote/rsc";
+import remarkGfm from "remark-gfm";
 import { ExternalLink } from "lucide-react";
 import { SiGithub, SiStreamlit } from "react-icons/si";
-import Link from "next/link";
-import { Badge } from "@/components/ui/Badge";
 import { TechBadge } from "@/components/ui/TechBadge";
 import { ProjectBackLink } from "@/components/ui/ProjectBackLink";
 
 export async function generateStaticParams() {
-  const slugs = getProjectSlugs();
-  return slugs.map((slug) => ({
-    slug: slug.replace(/\.mdx$/, ""),
-  }));
+  return getProjectSlugs().map((slug) => ({ slug }));
 }
+
+// Every project is known at build time. Without this, an unknown slug reaches
+// the loader and fails with a 500 instead of rendering the 404 page.
+export const dynamicParams = false;
 
 type Props = {
   params: Promise<{ slug: string }>;
@@ -81,7 +81,10 @@ export default async function ProjectPage({ params }: Props) {
 
         {/* The Markdown Content */}
         <div className="prose prose-lg dark:prose-invert mt-16 max-w-none prose-strong:text-primary">
-           <MDXRemote source={content} />
+           <MDXRemote
+             source={content}
+             options={{ mdxOptions: { remarkPlugins: [remarkGfm] } }}
+           />
         </div>
       </div>
     </article>

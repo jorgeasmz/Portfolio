@@ -28,7 +28,7 @@ export function QuantumBackground() {
     const connectionDistance = 150;
     const mouseDistance = 200;
 
-    let mouse = { x: 0, y: 0 };
+    const mouse = { x: 0, y: 0 };
 
     const resize = () => {
       canvas.width = canvas.parentElement?.offsetWidth || window.innerWidth;

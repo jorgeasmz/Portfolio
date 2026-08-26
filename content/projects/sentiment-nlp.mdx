@@ -1,35 +1,68 @@
 ---
 title: "NLP Sentiment Analysis Service"
-summary: "A production-grade NLP microservice stack using DistilBERT for sentiment classification, featuring a FastAPI backend and Docker containerization."
+summary: "A DistilBERT inference service, and an evaluation showing that its confidence score cannot be trusted: every sarcasm failure comes back at maximum certainty."
 image: "/images/projects/nlp-sentiment-bg.png"
-techStack: ["Python", "FastAPI", "Hugging Face", "Streamlit", "Docker", "Pydantic"]
+techStack: ["Python", "FastAPI", "Transformers", "PyTorch", "Streamlit", "Docker"]
 demoUrl: "https://jorgeasmz-nlp-sentiment-analysis.streamlit.app/"
 repoUrl: "https://github.com/jorgeasmz/NLP-Sentiment-Analysis"
 date: "2024-05-20"
+order: 3
 ---
 
-## The Vision
+## Serving a Transformer Is the Easy Half
 
-Natural Language Processing (NLP) models are powerful, but often difficult to integrate into real-world applications. This project bridges that gap. It is not just an analysis script; it is a full-stack microservices architecture designed to serve state-of-the-art Transformer models via a standard REST API.
+Wrapping a Hugging Face pipeline in an API takes an afternoon. The interesting question is what
+the model does when the input is not a movie review, and whether its own confidence tells you
+anything about that.
 
-## Technical Architecture
+So the evaluation is not a single accuracy number. It is a curated set of 29 cases grouped by
+the linguistic phenomenon each one probes.
 
-The system is engineered for scalability and separation of concerns, mirroring how AI services are deployed in enterprise environments.
+| Category | Accuracy |
+|---|---|
+| Clear positive | 100% |
+| Clear negative | 100% |
+| Mixed sentiment | 100% |
+| Negation | 67% |
+| Short phrases | 75% |
+| **Sarcasm** | **33%** |
+| **Overall** | **82.8%** |
 
-### 1. The Core (Model Layer)
-At the heart of the system is a **DistilBERT** model (fine-tuned on the SST-2 dataset). I chose DistilBERT because it retains 97% of BERT's performance while being 40% lighter and 60% faster—crucial metrics for a real-time inference API. 
+## The Confidence Score Is Not a Trust Signal
 
-I implemented a **Singleton Pattern** for the model loader. This ensures that the heavy model is loaded into memory only once when the server starts, rather than reloading for every user request, drastically reducing latency.
+The failures are not sitting near the decision boundary where you might catch them. They come
+back at the top of the range:
 
-### 2. The API Layer (FastAPI)
-The backend is built with **FastAPI**. It handles:
-*   **Validation:** Using **Pydantic** models to rigorously check incoming JSON payloads before they reach the model.
-*   **Routing:** Clean endpoint structure (`POST /predict`) that returns standardized JSON responses (`label` and `confidence score`).
+| Text | Expected | Predicted | Score |
+|---|---|---|---|
+| Oh brilliant, another update that breaks everything. | NEGATIVE | POSITIVE | 1.00 |
+| Wonderful, it arrived in three pieces. Exactly what I wanted. | NEGATIVE | POSITIVE | 1.00 |
+| Never again. | NEGATIVE | POSITIVE | 0.99 |
 
-### 3. The Interface (Streamlit)
+A sentence-level classifier reads surface lexical cues. Sarcasm inverts the meaning while leaving
+those cues intact, so the model is not merely wrong, it is **confidently** wrong.
 
-To demonstrate the API's capabilities, I developed a simple **Streamlit** frontend. It provides a clean, interactive playground where users can type sentences and see the model's emotional analysis in real-time, visualizing confidence scores for positive and negative sentiments.
+The practical consequence matters more than the observation: filtering predictions by confidence
+would keep exactly the wrong ones. Any deployment on user-generated text needs a different
+design, not a higher threshold. That is the sort of conclusion an evaluation is for.
 
-## Deployment & DevOps
+## Architecture
 
-The entire application is containerized using **Docker** and **Docker Compose**. This ensures that the complex dependency chain (PyTorch, Transformers, etc.) works identically on my local machine and the cloud server.
+Three layers with one responsibility each. `core` owns the model, `api` owns HTTP, `web` owns
+presentation, and the client reaches the service over HTTP only, which is what allows the two
+halves to be deployed independently: the API runs as a Docker Space on Hugging Face, the client
+on Streamlit Cloud.
+
+The model loader is a **lock-guarded singleton**. FastAPI serves synchronous endpoints from a
+worker threadpool, so without the lock two concurrent first requests could each start loading a
+250 MB checkpoint.
+
+## Engineering Notes
+
+Latency is measured, not assumed: 36.6 ms mean and 46.8 ms p95 for single-item CPU inference.
+
+One fix is worth recording because it is invisible until you look. `requirements.txt` pinned
+torch through `torch --index-url .../cpu`, and that option is a global directive in a
+requirements file. Appended to a package it is ignored, so pip resolved torch from PyPI and
+installed the CUDA build: a 4 GB environment of NVIDIA libraries for a service that runs on CPU.
+Declared correctly, the same install is 1.5 GB.

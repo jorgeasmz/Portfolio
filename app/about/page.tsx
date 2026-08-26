@@ -12,14 +12,14 @@ export default function AboutPage() {
       
       <div className="prose prose-lg dark:prose-invert text-muted-foreground">
         <p>
-          My journey into technology hasn't been a straight line, but rather a superposition of two passions: 
+          My journey into technology hasn&apos;t been a straight line, but rather a superposition of two passions: 
           <strong> Physics</strong> and <strong>Computer Science</strong>.
         </p>
         <p>
-          I graduated as a Systems Engineer in November 2025. However, I've been also pursuing a second degree in Physics since January 2023, driven by a desire to understand the way the universe works at its most fundamental level.
+          I graduated as a Systems Engineer in November 2025. However, I&apos;ve been also pursuing a second degree in Physics since January 2023, driven by a desire to understand the way the universe works at its most fundamental level.
         </p>
         <p>
-          My main goal is to merge these two fields either theoretically or experimentally through research in areas like <strong>Quantum Computing</strong> and <strong>Quantum Information</strong>. Nonetheless, I also enjoy applying my skills in building scalable software solutions, whether it's web applications or data pipelines.
+          My main goal is to merge these two fields either theoretically or experimentally through research in areas like <strong>Quantum Computing</strong> and <strong>Quantum Information</strong>. Nonetheless, I also enjoy applying my skills in building scalable software solutions, whether it&apos;s web applications or data pipelines.
         </p>
         
         <div className="flex justify-center w-full md:w-4/5 mx-auto">
@@ -38,7 +38,7 @@ export default function AboutPage() {
                     <span>Lethbridge, Canada</span>
                 </div>
                 <ul className="list-disc pl-4 space-y-1 text-sm text-muted-foreground">
-                    <li>Research work entitled "Quantum Accelerated Approximation Algorithms".</li>
+                    <li>Research work entitled &quot;Quantum Accelerated Approximation Algorithms&quot;.</li>
                     <li>Understanding and implementation of quantum algorithms such as SWAP Test and VQLS.</li>
                     <li>Simulation of quantum algorithms on local devices to solve computational problems.</li>
                     <li>Use of noise models to simulate quantum algorithms under realistic conditions.</li>
@@ -56,7 +56,7 @@ export default function AboutPage() {
                     <span>Cali, Colombia</span>
                 </div>
                 <ul className="list-disc pl-4 space-y-1 text-sm text-muted-foreground">
-                    <li>Research work entitled "Use of Decoy States for Increasing Security in a Quantum Key Distribution Protocol".</li>
+                    <li>Research work entitled &quot;Use of Decoy States for Increasing Security in a Quantum Key Distribution Protocol&quot;.</li>
                     <li>Programming an FPGA as an electronic device for photon counting in an optical setup.</li>
                     <li>Development of a computational simulation of the BB84 QKD protocol.</li>
                     <li>Development of a computational simulation of the Decoy States BB84 QKD protocol.</li>

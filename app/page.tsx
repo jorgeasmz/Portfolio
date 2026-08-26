@@ -1,4 +1,4 @@
-import { getAllProjects } from "@/lib/mdx";
+import { getFeaturedProjects } from "@/lib/mdx";
 import { ProjectCard } from "@/components/ui/ProjectCard";
 import { ResearchItem } from "@/components/ui/ResearchCard";
 import { ResearchCarousel } from "@/components/ui/ResearchCarousel";
@@ -10,7 +10,8 @@ import { QuantumBackground } from "@/components/animations/QuantumBackground";
 import Image from "next/image";
 
 export default function Home() {
-  const projects = getAllProjects().slice(0, 2); // Only show 2 featured projects
+  // Selection is explicit in each file's front matter, not a side effect of dates.
+  const projects = getFeaturedProjects(2);
 
   const researchItems: ResearchItem[] = [
     {

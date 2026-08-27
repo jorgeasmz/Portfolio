@@ -1,58 +1,116 @@
 ---
-title: "Time-Series Forecasting Dashboard"
-summary: "A Prophet forecasting service benchmarked against naive baselines, where writing the first test uncovered a chart that had been broken in production."
+title: "Time-Series Forecasting Service"
+summary: "Backtests four model families against five series with rolling-origin cross-validation, selects one per series and reports interval calibration alongside point accuracy."
 image: "/images/projects/forecasting-bg.png"
-techStack: ["Python", "Prophet", "Plotly", "Streamlit", "pandas"]
+techStack: ["Python", "Prophet", "statsmodels", "LightGBM", "PostgreSQL", "FastAPI"]
 demoUrl: "https://jorgeasmz-dashboard-forecasting.streamlit.app/"
 repoUrl: "https://github.com/jorgeasmz/Dashboard-Forecasting"
 date: "2024-06-15"
-order: 4
+order: 3
 ---
 
-## A Forecast Is Only Worth Its Baseline
+## Series
 
-Any model produces a line on a chart. The question is whether that line beats the cheapest
-possible alternative, and for a seasonal series the cheapest alternative is not "repeat the last
-value" but "repeat what happened this month last year".
+Five published series with different structure, stored in PostgreSQL alongside the
+parameters used to model each one.
 
-Backtested on monthly car sales with the final twelve months held out:
+| Series | Observations | Frequency | Cycle | Horizon |
+|---|---:|---|---:|---:|
+| Airline passengers | 144 | monthly | 12 | 12 |
+| Monthly car sales | 108 | monthly | 12 | 12 |
+| Monthly sunspots | 600 | monthly | 1 | 12 |
+| Daily minimum temperatures | 1,460 | daily | 365 | 28 |
+| Daily female births | 365 | daily | 7 | 14 |
 
-| Model | MAPE | MAE | RMSE |
-|---|---|---|---|
-| **Prophet** | **7.19%** | **1336.8** | **1749.2** |
-| Seasonal naive (t−12) | 10.83% | 1959.5 | 2290.8 |
-| Naive (last value) | 22.27% | 4599.0 | 5865.4 |
+The sunspot series is modelled as non-seasonal because its cycle runs about 132
+months, which no seasonal term in this configuration can represent.
 
-Prophet cuts the error of the seasonal baseline by a third. Beating the last-value baseline would
-have proved nothing on a series with this much annual structure; the seasonal one is the bar that
-had to be cleared.
+## Evaluation method
 
-## The Test That Found a Live Bug
+Four model families are evaluated against each series: a seasonal naive baseline,
+Prophet, SARIMA from statsmodels, and LightGBM over lag and calendar features.
+All four implement the same interface and return a point forecast with an 80%
+prediction interval, so the same scoring applies to each.
 
-The chart on the deployed app had been broken, and nobody had noticed because the failure only
-triggers after training completes.
+Evaluation uses rolling-origin cross-validation. Each fold advances the training
+cutoff by one horizon and refits every model, producing four measurements per
+model and series, or 80 fits in total.
 
-Prophet's own Plotly helper runs `assert m.history` on a pandas DataFrame. Pandas refuses to
-evaluate a DataFrame's truthiness and raises `ValueError` instead, so the assertion fails for
-every fitted model, which is the only kind you would ever plot. The intent was clearly to check
-that the model had been trained; the effect was the opposite.
+MAPE is not reported. The series span four orders of magnitude, from single-digit
+temperatures to car sales in the tens of thousands, and two of them contain values
+below 1.0: sunspots reach 0.20 and temperatures 0.50. A five-unit error against an
+observation of 0.20 registers as 2,500%, which would dominate any average
+containing it. MASE divides the mean absolute error by the in-sample mean absolute
+error of the seasonal naive, giving a scale-free figure where 1.0 matches the
+baseline.
 
-The figure is now built directly with `graph_objects`: observed points, the prediction line and
-the uncertainty band as a filled region. That removed the dependency on a broken helper and made
-the chart consistent with the rest of the visualisations.
+## Results
 
-The test that caught it was a smoke test, the kind that is easy to skip on the grounds that
-plotting code is not worth covering.
+Lowest mean MASE per series across four folds:
+
+| Series | Selected model | MASE | Coverage |
+|---|---|---:|---:|
+| Daily minimum temperatures | prophet | 0.688 | 75% |
+| Daily female births | prophet | 0.779 | 79% |
+| Airline passengers | sarima | 0.794 | 67% |
+| Monthly car sales | seasonal_naive | 0.999 | 100% |
+| Monthly sunspots | lightgbm | 2.041 | 35% |
+
+Three families win across five series, and on one of them no family beats the
+baseline.
+
+### Car sales
+
+This is the series the project previously used on its own, evaluated on a single
+split of the final twelve months. Under that split Prophet reduced the error of
+the seasonal naive by roughly a third. Across four folds the ordering reverses:
+
+| Model | MASE | MAE |
+|---|---:|---:|
+| **seasonal_naive** | **0.999** | **1,584.98** |
+| prophet | 1.114 | 1,778.63 |
+| lightgbm | 1.130 | 1,801.69 |
+| sarima | 1.306 | 2,086.20 |
+
+The earlier result held for one window and did not generalise to the others.
+
+### Interval calibration
+
+Nominal interval width is 80%. Observed coverage across models and series:
+
+| Model | Coverage range |
+|---|---|
+| sarima | 56% to 80% |
+| seasonal_naive | 71% to 100% |
+| prophet | 40% to 80% |
+| lightgbm | 35% to 55% |
+
+LightGBM under-covers on every series. Its intervals come from quantile regression
+at 0.1 and 0.9 evaluated at each recursive step, and that procedure does not
+accumulate the uncertainty introduced by feeding predicted values back into the lag
+features. SARIMA, whose intervals derive from the state-space model variance,
+tracks the nominal level most closely.
 
 ## Architecture
 
-Each stage is a module with a single responsibility, and data access is split in two: a pure
-function that reads and raises, and a cached Streamlit wrapper that catches and degrades to an
-empty frame. The application needs to show a warning rather than a traceback; the tests need a
-failure to be observable. One function cannot do both.
+```mermaid
+flowchart LR
+    SRC[("Published CSV series")] --> ING["ingest<br/>parse, clean, store"]
+    ING --> DB[("PostgreSQL<br/>series, observations, evaluations")]
+    DB --> BT["backtest<br/>rolling origin, 4 families"]
+    BT --> DB
+    DB --> API["FastAPI<br/>/series, /evaluation, /forecast"]
+    DB --> UI["Streamlit dashboard"]
+```
 
-## Engineering Notes
+Ingestion and backtesting run as a batch job that writes to the database. The
+dashboard and the API read from it. Series metadata travels with the stored series
+rather than being read from the source registry at serving time, so both consumers
+depend on the database alone.
 
-13 tests at 100% coverage of the application modules, with the Prophet-fitting ones marked slow
-so the fast suite stays under a second. The evaluation itself is a committed script rather than
-a number typed into a README, so the table above can be regenerated on demand.
+## Testing
+
+60 tests at 95% coverage of the application packages. The suite runs offline:
+series are read from fixtures rather than downloaded, models are fitted on a
+60-point synthetic series, and the database is a temporary SQLite file. CI
+additionally applies the migrations against a PostgreSQL service container.

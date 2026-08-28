@@ -24,10 +24,10 @@ Sweeping the threshold against F1 moves the operating point to **0.30**, lifting
 62% at the cost of a longer list to work through. That trade is a business decision, and the
 point of surfacing it is that 0.5 was never a decision at all.
 
-## Smaller and Better at the Same Time
+## Tree depth
 
-The forest was originally left unbounded, growing each tree until its leaves were pure. Measuring
-depth against both quality and size:
+An unbounded forest grows each tree until its leaves are pure. Measuring depth against both
+ranking quality and artifact size:
 
 | max_depth | ROC-AUC | PR-AUC | Artifact |
 |---|---|---|---|
@@ -36,22 +36,21 @@ depth against both quality and size:
 | **8** | **0.866** | **0.712** | **2.0 MB** |
 | 6 | 0.861 | 0.702 | 0.8 MB |
 
-Capping depth at 8 improves ranking quality *and* shrinks the artifact by a factor of eight.
-Unbounded trees were memorising the noise in 8,000 training rows, which is what regularisation
-exists to prevent. The size mattered too: the artifact is versioned in git, so every retrain was
-leaving another 17 MB in the history permanently.
+Capping depth at 8 improves ranking quality and shrinks the artifact by a factor of eight.
+Unbounded trees memorise the noise in 8,000 training rows, which is what regularisation exists
+to prevent. Size matters as well, since the artifact is versioned in git and every retrain adds
+a full copy to the history.
 
-## The Bug That Version Drift Exposed
+## Version drift
 
-Encoding gender used to be guarded by `if df['Gender'].dtype == 'object'`. Under pandas 3 text
-columns use a dedicated string dtype, so that check silently stopped matching, the mapping never
-ran, and raw strings reached the estimator. Training failed outright with
+Gender encoding tests for a non-numeric dtype rather than for `dtype == 'object'`. Under pandas 3
+a text column carries a dedicated string dtype, so the narrower check skips the mapping and lets
+raw strings reach the estimator, where training stops with
 `could not convert string to float: 'Male'`.
 
-The serialized model had the same class of problem from the other direction: written by
-scikit-learn 1.8 and loaded by 1.9, a combination the library explicitly warns can produce
-invalid results without failing. Both trace back to the same root cause, which is unpinned
-dependencies around a binary artifact.
+The artifact is a pickle, and scikit-learn states that loading one written by a different version
+can produce invalid results without raising. Dependencies are pinned for that reason: a binary
+artifact and a floating dependency range do not combine safely.
 
 ## Architecture
 

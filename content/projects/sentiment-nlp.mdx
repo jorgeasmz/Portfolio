@@ -59,10 +59,10 @@ worker threadpool, so without the lock two concurrent first requests could each 
 
 ## Engineering Notes
 
-Latency is measured, not assumed: 36.6 ms mean and 46.8 ms p95 for single-item CPU inference.
+Latency is measured rather than assumed: 36.6 ms mean and 46.8 ms p95 for single-item CPU
+inference.
 
-One fix is worth recording because it is invisible until you look. `requirements.txt` pinned
-torch through `torch --index-url .../cpu`, and that option is a global directive in a
-requirements file. Appended to a package it is ignored, so pip resolved torch from PyPI and
-installed the CUDA build: a 4 GB environment of NVIDIA libraries for a service that runs on CPU.
-Declared correctly, the same install is 1.5 GB.
+`requirements.txt` declares the CPU wheel index on its own line. That directive is global in a
+requirements file, and appending it to a package leaves it ignored, which resolves torch from
+PyPI and installs the CUDA build: 4 GB of NVIDIA libraries for a service that runs on CPU.
+Declared correctly the environment is 1.5 GB.

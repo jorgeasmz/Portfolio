@@ -61,9 +61,7 @@ baseline.
 
 ### Car sales
 
-This is the series the project previously used on its own, evaluated on a single
-split of the final twelve months. Under that split Prophet reduced the error of
-the seasonal naive by roughly a third. Across four folds the ordering reverses:
+On this series no family improves on the seasonal naive:
 
 | Model | MASE | MAE |
 |---|---:|---:|
@@ -72,7 +70,9 @@ the seasonal naive by roughly a third. Across four folds the ordering reverses:
 | lightgbm | 1.130 | 1,801.69 |
 | sarima | 1.306 | 2,086.20 |
 
-The earlier result held for one window and did not generalise to the others.
+Measured on the final twelve months alone the ordering inverts: Prophet leads at
+0.866 and the seasonal naive comes last at 1.270. Averaging over four folds is what
+separates a model from a favourable window.
 
 ### Interval calibration
 

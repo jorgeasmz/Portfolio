@@ -9,20 +9,19 @@ date: "2024-03-10"
 order: 5
 ---
 
-## Accuracy Says Almost Nothing Here
+## Class imbalance and metric choice
 
 Roughly 20% of the customers in this dataset churn. A model that predicts nobody ever leaves is
-therefore right 79.6% of the time while being entirely useless, and the trained Random Forest
-reaches 86.9%. Seven points of separation is the entire distance between the model and doing
-nothing.
+therefore right 79.6% of the time while identifying none of them, and the trained Random Forest
+reaches 86.9%. Seven points separate the model from that constant policy.
 
 Recall on the positive class is the number that matters. At the default 0.5 threshold the model
 catches 44% of the customers who actually leave. A customer who is never flagged can never be
 retained, so more than half the opportunity is lost before anyone reads the output.
 
 Sweeping the threshold against F1 moves the operating point to **0.30**, lifting detection to
-62% at the cost of a longer list to work through. That trade is a business decision, and the
-point of surfacing it is that 0.5 was never a decision at all.
+62% at the cost of a longer list to work through. The trade is a business decision, and 0.5
+corresponds to equal misclassification costs rather than to a stated one.
 
 ## Tree depth
 

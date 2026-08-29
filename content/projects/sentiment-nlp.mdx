@@ -1,68 +1,143 @@
 ---
 title: "NLP Sentiment Analysis Service"
-summary: "A DistilBERT inference service, and an evaluation showing that its confidence score cannot be trusted: every sarcasm failure comes back at maximum certainty."
-image: "/images/projects/nlp-sentiment-bg.png"
-techStack: ["Python", "FastAPI", "Transformers", "PyTorch", "Streamlit", "Docker"]
+summary: "A sentiment classifier whose confidence carries no information about irony, paired with a DistilBERT irony head fine-tuned on TweetEval and served as a quantised ONNX graph."
+image: "/images/projects/nlp-irony-bg.png"
+techStack: ["Python", "FastAPI", "Transformers", "PyTorch", "ONNX Runtime", "MLflow", "Streamlit", "Docker"]
 demoUrl: "https://jorgeasmz-nlp-sentiment-analysis.streamlit.app/"
 repoUrl: "https://github.com/jorgeasmz/NLP-Sentiment-Analysis"
 date: "2024-05-20"
 order: 4
 ---
 
-## Serving a Transformer Is the Easy Half
+## Failure mode of the sentiment checkpoint
 
-Wrapping a Hugging Face pipeline in an API takes an afternoon. The interesting question is what
-the model does when the input is not a movie review, and whether its own confidence tells you
-anything about that.
-
-So the evaluation is not a single accuracy number. It is a curated set of 29 cases grouped by
-the linguistic phenomenon each one probes.
-
-| Category | Accuracy |
-|---|---|
-| Clear positive | 100% |
-| Clear negative | 100% |
-| Mixed sentiment | 100% |
-| Negation | 67% |
-| Short phrases | 75% |
-| **Sarcasm** | **33%** |
-| **Overall** | **82.8%** |
-
-## The Confidence Score Is Not a Trust Signal
-
-The failures are not sitting near the decision boundary where you might catch them. They come
-back at the top of the range:
+A curated set of 29 cases, grouped by the linguistic phenomenon each one probes, places the
+served SST-2 checkpoint at 82.8% overall and 33% on sarcasm. The sarcastic failures are not
+located near the decision boundary. They return at the top of the range:
 
 | Text | Expected | Predicted | Score |
-|---|---|---|---|
+|---|---|---|---:|
 | Oh brilliant, another update that breaks everything. | NEGATIVE | POSITIVE | 1.00 |
 | Wonderful, it arrived in three pieces. Exactly what I wanted. | NEGATIVE | POSITIVE | 1.00 |
 | Never again. | NEGATIVE | POSITIVE | 0.99 |
 
-A sentence-level classifier reads surface lexical cues. Sarcasm inverts the meaning while leaving
-those cues intact, so the model is not merely wrong, it is **confidently** wrong.
+A sentence-level classifier reads surface lexical cues, and irony inverts the intended polarity
+while leaving those cues intact. Discarding low-confidence predictions therefore retains the
+inverted ones.
 
-The practical consequence matters more than the observation: filtering predictions by confidence
-would keep exactly the wrong ones. Any deployment on user-generated text needs a different
-design, not a higher threshold. That is the sort of conclusion an evaluation is for.
+The extent of that is measurable. A logistic regression fitted on the checkpoint's own output,
+a single feature holding its confidence signed by polarity, recovers irony on the TweetEval test
+split at an ROC-AUC of **0.479**. The output carries no information about whether its input is
+ironic, which places the failure outside the reach of any threshold on the score and makes a
+second classifier the available response.
 
-## Architecture
+## Baselines and fine-tuning
 
-Three layers with one responsibility each. `core` owns the model, `api` owns HTTP, `web` owns
-presentation, and the client reaches the service over HTTP only, which is what allows the two
-halves to be deployed independently: the API runs as a Docker Space on Hugging Face, the client
-on Streamlit Cloud.
+The irony head is fine-tuned from `distilbert-base-uncased` on the TweetEval irony
+configuration: 2,862 training tweets, 955 validation and 784 held out, the last at 39.7% ironic.
+Every row below decides at argmax, the rule the published benchmark numbers use.
 
-The model loader is a **lock-guarded singleton**. FastAPI serves synchronous endpoints from a
-worker threadpool, so without the lock two concurrent first requests could each start loading a
-250 MB checkpoint.
+| Model | Accuracy | Macro F1 | F1 ironic | Precision | Recall |
+|---|---:|---:|---:|---:|---:|
+| Sentiment probe | 0.523 | 0.467 | **0.294** | 0.356 | 0.251 |
+| Majority class | 0.397 | 0.284 | **0.568** | 0.397 | 1.000 |
+| TF-IDF and logistic regression | 0.667 | 0.659 | **0.605** | 0.571 | 0.643 |
+| Fine-tuned, four blocks frozen | 0.663 | 0.660 | **0.624** | 0.560 | 0.704 |
+| Fine-tuned, all parameters | 0.672 | 0.672 | **0.664** | 0.559 | 0.817 |
 
-## Engineering Notes
+The majority class predicts the ironic label, which the training split favours, and reaches
+perfect recall with no discrimination. Word and character n-grams into logistic regression
+measure what surface features recover without a language model. Freezing the embeddings and the
+lowest four transformer blocks leaves 14.8M of 67.0M parameters trainable and costs 0.040 of
+ironic-class F1. Full fine-tuning is the run that is exported and served.
 
-Latency is measured rather than assumed: 36.6 ms mean and 46.8 ms p95 for single-item CPU
-inference.
+Each run is recorded in MLflow with its hyperparameters, per-epoch metrics, held-out metrics and
+confusion matrix, on a SQLite backend since MLflow 3 places the filesystem store in maintenance
+mode.
 
-`requirements.txt` declares the CPU wheel index on its own line. That directive is global in a
-requirements file, and appending it to a package leaves it ignored, which resolves torch from
-PyPI and installs the CUDA build: 4 GB of NVIDIA libraries for a service that runs on CPU.
-Declared correctly the environment is 1.5 GB.
+## Decision threshold
+
+| Operating point | Threshold | Accuracy | Macro F1 | F1 ironic | Precision | Recall |
+|---|---:|---:|---:|---:|---:|---:|
+| Argmax | 0.50 | 0.675 | **0.672** | 0.706 | 0.622 | 0.818 |
+| Selected | 0.84 | 0.707 | **0.706** | 0.688 | 0.699 | 0.678 |
+
+The threshold is selected on the validation split and written to `decision.json` beside the
+weights, so the operating point is an output of training rather than a constant in the serving
+code.
+
+The selection criterion is macro F1 rather than ironic-class F1. Both error directions carry
+cost for a flag: an undetected ironic input leaves an inverted sentiment label unqualified, and
+a false alarm on plain text makes the flag uninformative. Ironic-class F1 prices only the first,
+and selecting on it places the threshold at 0.44, where the head flags 25 of the 29 curated
+cases rather than 17.
+
+The selection also runs on the exported graph rather than on the checkpoint. Quantisation shifts
+the probability scale, so the same criterion resolves to 0.89 on the checkpoint and 0.84 on the
+int8 graph. Selecting on the artifact that is served keeps the threshold and the scores it is
+compared against on one scale.
+
+## Runtime selection
+
+Each runtime is held to one intra-op thread, which approximates a container on a free tier, and
+decides at argmax. Scoring them against the selected threshold would credit quantisation for the
+fact that the threshold was chosen on the quantised graph.
+
+| Runtime | Size MB | p50 ms | p95 ms | Accuracy | F1 ironic |
+|---|---:|---:|---:|---:|---:|
+| PyTorch fp32 | 268 | 67.3 | 87.6 | 0.672 | 0.664 |
+| ONNX fp32 | 269 | 35.2 | 51.7 | 0.672 | 0.664 |
+| **ONNX int8** | **68** | **15.8** | **25.3** | 0.667 | 0.658 |
+
+Exporting the graph halves the latency at identical weights, and quantising the weights to int8
+halves it again while reducing the artifact from 268 MB to 68 MB, for 0.006 of ironic-class F1.
+The int8 graph is the one served, since on a free tier the artifact size governs image pull time
+and cold-start latency.
+
+The ONNX exporter records shapes for intermediate tensors and then optimises the graph without
+updating them. The quantiser re-runs shape inference and rejects the contradiction, so the stale
+entries are removed before quantisation and recomputed from the graph.
+
+## Domain transfer
+
+The curated set consists of formal written English, which is outside the domain the head was
+fitted on. At the selected threshold it flags 17 of the 29 cases, including 5 of the 6 plainly
+negative ones, so the score distribution shifts upward and separates the classes poorly on that
+text.
+
+The held-out TweetEval figures are the ones that characterise the head. On tweets the two
+classes separate: the median ironic score is 0.944 against 0.402 for non-ironic. A deployment on
+text unlike a tweet would require its threshold selected on a sample of that text.
+
+## Serving
+
+`core` owns the models, `api` owns HTTP, `web` owns presentation, and `training` owns everything
+that produces an artifact rather than serving one. The training package is absent from the
+serving image, since a trainer, a dataset loader and a tracking server add layers that never
+answer a request.
+
+Both heads are loaded once behind a lock, since FastAPI serves synchronous endpoints from a
+worker threadpool and two concurrent first requests would otherwise each begin loading the same
+checkpoint. Every response carries an irony verdict, so readiness covers both heads rather than
+reporting them separately, and a failed load leaves the process alive with `model_ready` false.
+
+Each head truncates at the width it was fitted on, 512 tokens for sentiment and 96 for irony,
+and a test asserts that the serving constant and the training constant agree.
+
+## Deployment
+
+The API runs as a Docker Space on Hugging Face and the Streamlit client on Streamlit Cloud,
+joined by one environment variable. The irony head is in neither repository: it is published as a
+Hugging Face model repository carrying the int8 graph, the tokenizer and `decision.json`, and the
+loader resolves it at startup. The model card is generated from the tracked run, so the
+documented metrics and the recorded run cannot diverge.
+
+A free Space suspends on inactivity and needs time to wake and load both heads, so the client
+allows 90 seconds and reports a timeout explicitly.
+
+## Testing
+
+The suite contains 40 tests at 96% statement coverage of the application and model packages. No
+test downloads a model: each drives a fake pipeline or a fake ONNX session and asserts on how it
+was called, including that undeclared tensors are dropped from the feed and that inputs are cast
+to the int64 the exported graph declares.

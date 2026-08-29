@@ -19,6 +19,8 @@ import {
   SiGithub,
   SiKubernetes,
   SiHuggingface,
+  SiOnnx,
+  SiMlflow,
   SiFastapi,
   SiPhp,
   SiCplusplus,
@@ -94,6 +96,9 @@ const iconMap: Record<string, IconType | LucideIcon> = {
   "tensorflow": SiTensorflow,
   "pytorch": SiPytorch,
   "huggingface": SiHuggingface,
+  "onnx": SiOnnx,
+  "onnx runtime": SiOnnx,
+  "mlflow": SiMlflow,
   
   // Quantum
   "qiskit": SiQiskit,

@@ -16,6 +16,10 @@ updates:
       # eslint-config-next bundles a plugin that has not adopted the ESLint 10 rule API.
       - dependency-name: eslint
         update-types: ["version-update:semver-major"]
+      # That same bundled plugin rejects TypeScript 7 at load time, which fails lint
+      # rather than the typecheck. Tracked at typescript-eslint issue 10940.
+      - dependency-name: typescript
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: github-actions
     directory: "/"

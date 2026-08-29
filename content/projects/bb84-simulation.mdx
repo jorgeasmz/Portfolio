@@ -10,18 +10,18 @@ featured: true
 order: 1
 ---
 
-## Security From Physics, Not From Arithmetic
+## Security assumption
 
 Classical key exchange rests on computational hardness. RSA is safe because factoring large
-numbers is slow on the machines we have, which is a claim about engineering rather than a
+numbers is slow on available hardware, which is a claim about engineering rather than a
 theorem, and a sufficiently large quantum computer retires it.
 
 BB84 replaces that assumption with a physical constraint. Its guarantee does not depend on how
 much computing power an adversary owns; it depends on the fact that measuring an unknown quantum
-state disturbs it. An eavesdropper cannot listen silently, and the protocol is arranged so the
-legitimate parties can quantify how loud she was.
+state disturbs it. An eavesdropper cannot listen without leaving a trace, and the protocol is
+arranged so the legitimate parties can quantify the disturbance.
 
-## Running the Protocol
+## Protocol and sifting
 
 Alice generates random bits and, independently, picks a random basis for each one: rectilinear
 or diagonal. She encodes each bit in the basis she drew and sends the qubit onward.
@@ -35,9 +35,9 @@ they disagree. This is **sifting**, and roughly half the transmission survives i
 bases costs nothing because the basis is not the secret: the bit value is, and it is never
 revealed.
 
-## Three Scenarios, One Measurement
+## Simulated scenarios
 
-The simulator runs the protocol under three conditions, and the point is what separates them:
+The simulator runs the protocol under three conditions:
 
 **Ideal channel.** Alice and Bob's sifted keys agree completely. The error rate is zero, which is
 the reference every other run is read against.
@@ -55,18 +55,17 @@ those produce a wrong bit at Bob: an expected **25% error rate on the sifted key
 undisturbed channel would show none. The simulator computes exactly this **QBER** and surfaces it
 as the detection signal.
 
-## The Part That Makes It Interesting
+## Ambiguity of the error rate
 
 Noise and eavesdropping both raise the QBER, and the protocol cannot tell them apart.
 
-There is no measurement Alice and Bob can perform that says "this error came from a fibre
-imperfection, not from Eve". So the only safe reading is the pessimistic one: **attribute every
-error to an adversary**. Real deployments set a threshold, abort above it, and discard the key.
-This is why running the noisy scenario next to the eavesdropper scenario is instructive rather
-than decorative. It shows the ambiguity that any practical QKD system has to be engineered
-around.
+No measurement available to Alice and Bob separates an error caused by fibre imperfection from
+one caused by interception, so the conservative reading is the only safe one: **every error is
+attributed to an adversary**. Real deployments set a threshold, abort above it and discard the
+key. Running the noisy scenario alongside the eavesdropper scenario exhibits that ambiguity,
+which any practical QKD system has to be engineered around.
 
-## What the Application Shows
+## Interface
 
 The interface walks the protocol stage by stage rather than reporting a final number: Alice's
 bits and bases, the prepared qubits, Bob's basis choices and measurements, and the classical
@@ -74,10 +73,11 @@ post-processing that produces the sifted key. Alongside it are the statistics th
 legible, including histograms of measured bits, the error rate and the degree of key agreement,
 plus an explanatory section covering the encoding and decoding of bits in quantum states.
 
-Qiskit handles state preparation and measurement, so the quantum mechanics stays honest rather
-than being emulated with coin flips; Streamlit keeps the exploration in the browser.
+Qiskit performs state preparation and measurement, so the reported statistics arise from the
+simulated quantum states rather than from sampling the expected distribution directly. Streamlit
+keeps the exploration in the browser.
 
-## Research Context
+## Research context
 
 This simulator sits alongside separate academic work on quantum key distribution at CIBioFI,
 Universidad del Valle: a study of vacuum and weak decoy states as a countermeasure against

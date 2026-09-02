@@ -21,6 +21,8 @@ import {
   SiHuggingface,
   SiOnnx,
   SiMlflow,
+  SiLanggraph,
+  SiGooglegemini,
   SiFastapi,
   SiPhp,
   SiCplusplus,
@@ -71,6 +73,7 @@ const iconMap: Record<string, IconType | LucideIcon> = {
   // Databases
   "mysql": SiMysql,
   "postgresql": SiPostgresql,
+  "pgvector": SiPostgresql,
   "sqlite": SiSqlite,
   "mariadb": SiMariadb,
   "mongodb": SiMongodb,
@@ -99,6 +102,8 @@ const iconMap: Record<string, IconType | LucideIcon> = {
   "onnx": SiOnnx,
   "onnx runtime": SiOnnx,
   "mlflow": SiMlflow,
+  "langgraph": SiLanggraph,
+  "gemini": SiGooglegemini,
   
   // Quantum
   "qiskit": SiQiskit,

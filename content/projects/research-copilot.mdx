@@ -1,0 +1,264 @@
+---
+title: "Research Copilot"
+summary: "A grounded question answering service over 240 arXiv papers that resolves every citation back to a paragraph, reports the numbers it cannot resolve, and runs its whole inference stack in 265 MB."
+image: "/images/projects/research-copilot-bg.png"
+techStack: ["Python", "FastAPI", "PostgreSQL", "pgvector", "ONNX Runtime", "LangGraph", "Gemini", "Next.js"]
+demoUrl: "https://research-copilot-livid.vercel.app"
+repoUrl: "https://github.com/jorgeasmz/Research-Copilot"
+date: "2026-09-01"
+featured: true
+order: 1
+---
+
+## Corpus scope
+
+The corpus is 240 arXiv papers on quantum key distribution and quantum cryptography rather than
+a sample of `quant-ph` as a whole. Retrieval across a category of 185,000 papers on unrelated
+subjects mostly measures topic separation, since almost any method tells an optics paper from an
+error-correction one. Within one field that signal is absent, and what remains measured is
+passage selection.
+
+The difference is large enough to reverse a design decision. On a general `quant-ph` corpus of
+249 papers the same question set reaches 0.82 passage accuracy with no reranking; within quantum
+cryptography the same configuration reaches 0.43.
+
+Papers are ingested from their LaTeX source rather than from the rendered PDF. A two-column
+preprint loses in layout what a citation needs: section headings become indistinguishable from
+body text and paragraphs fragment around displayed equations. Measured on the first three papers,
+PDF extraction recovered one section per paper, the title, while the LaTeX source recovers the
+hierarchy the document declares.
+
+| | |
+|---|---:|
+| Papers ingested | 240 |
+| Chunks | 18,969 |
+| Distinct sections | 2,952 |
+| Mean chunk length | 530 characters |
+
+Of 300 papers requested, 60 were dropped: 47 whose source the LaTeX renderer could not process
+and the rest without retrievable source. That 20% is a property of what authors upload rather
+than of the pipeline.
+
+## Retriever comparison
+
+Nineteen hand-written questions, fourteen of them anchored to the passage they were written from.
+A result is judged twice: whether the answering paper appears in the top five, and whether that
+passage does.
+
+| Retriever | Paper found | Passage found | MRR | Latency ms |
+|---|---:|---:|---:|---:|
+| `postgres fts` | 0.37 | 0.07 | 0.215 | 95 |
+| `dense` | 0.58 | 0.43 | 0.342 | 11 |
+| `bm25` | 0.84 | 0.43 | 0.627 | **4** |
+| `hybrid` | 0.79 | 0.43 | 0.636 | 24 |
+| **`hybrid+rerank`** | **0.89** | **0.71** | **0.718** | 1,108 |
+
+Fusion combines ranks rather than scores. A BM25 score and a cosine similarity live on scales
+that are not comparable and neither is calibrated, so weighting them directly would require
+normalising a quantity with no fixed range.
+
+The same code is measured against BEIR SciFact, whose relevance judgements make the figures
+comparable to published ones. There `bm25` reaches nDCG@10 0.652 and `dense` 0.702, which is
+where the published SciFact numbers for those methods sit. That is the check that the
+implementation is correct rather than merely self-consistent. Serving both encoders as int8
+graphs costs 0.011 of nDCG on `dense` and `hybrid` and 0.006 with reranking, and BM25 does not
+move, which is the check that the difference comes from the encoders rather than from the
+harness.
+
+## Term index storage
+
+BM25 is built in process from the stored chunks as one compressed sparse matrix of term
+frequencies rather than as a dictionary per document. The scoring is the Okapi formula either
+way and both retrieve the same passages, so the storage is what decides whether the index fits
+in a service or dominates it.
+
+| | Resident | Query |
+|---|---:|---:|
+| Dictionary per document | 558 MB | 86 ms |
+| **Sparse matrix** | **44 MB** | **4 ms** |
+
+The matrix itself holds 8.6 MB of the 44. The two differ in how they treat a term common enough
+to earn a negative weight under the unsmoothed formula: the library floors it, this
+implementation smooths it, and the ordering inside the top five shifts accordingly.
+
+Moving lexical search into Postgres was measured as the alternative that needs no index in the
+process at all. `ts_rank_cd` carries no inverse document frequency, so a term appearing in most
+passages weighs as much as one appearing in two, and the ranking reaches 0.07 passage accuracy
+against 0.43 for BM25.
+
+## Reranking depth
+
+| Depth | Paper found | Passage found | MRR | Retrieval p50 |
+|---|---:|---:|---:|---:|
+| No reranking | 0.79 | 0.43 | 0.636 | 24 ms |
+| 5 | 0.79 | 0.43 | 0.605 | 384 ms |
+| 10 | 0.89 | 0.57 | **0.732** | 1,248 ms |
+| **25** | **0.89** | **0.71** | 0.718 | 3,762 ms |
+| 50 | 0.84 | 0.71 | 0.673 | |
+
+Depth 5 costs 360 ms and recovers nothing the fusion had not already ranked. Depth 10 reaches
+the best MRR at a third of the latency. Depth 25 is what ships, because passage selection is the
+operation the service performs and 0.71 against 0.57 is two more of the fourteen anchored
+questions, on a request whose generation step takes nine seconds regardless. Those latencies
+are measured with the cross-encoder scoring 25 pairs per forward pass; scoring two per pass,
+which the memory budget below settles on, reaches 1,108 ms at the same depth.
+
+The two evaluations disagree about the reranker. On 300 judged SciFact queries the cross-encoder
+lowers nDCG@10 from 0.709 to 0.703 and reducing the depth does not recover the loss, which is
+consistent with SciFact being claim verification against abstracts and the model being trained
+on web passages. On the corpus it raises passage selection from 0.43 to 0.71. It is enabled on
+the second basis, with the caveat that fourteen anchored questions is a small sample. A larger
+cross-encoder is not an alternative at this budget: measured over five queries at the same
+depth, `bge-reranker-base` takes 19.1 s per query against 3.2 s for the one in use.
+
+## Answer construction
+
+A comparison is not one retrieval. Retrieving once for a question about how two protocols differ
+returns passages about whichever side dominates the query, so the graph fans out and retrieves
+per side before answering. Routing is a regular expression rather than a model call, since the
+free tier meters requests and one spent classifying is one not spent answering.
+
+Every claim carries a bracketed number naming the passage it came from, and every number is
+resolved back to a paper, a section and a paragraph after the answer is written. A number outside
+what was retrieved is reported as a fabrication rather than rendered as a citation.
+
+The provider holds a chain of models. A 429 means that model's daily quota is spent, which no
+amount of waiting fixes, so the next model is tried immediately; a 503 means it is briefly busy,
+which waiting does fix.
+
+## Grounding
+
+Twenty-five questions: the nineteen the corpus covers, and six on subjects it does not contain
+at all.
+
+| | Covered | Uncovered |
+|---|---:|---:|
+| Questions | 19 | 6 |
+| Fabricated citations | **0** | **0** |
+| Declined to answer | 6 | **6** |
+| Sentences carrying a citation | 0.98 | |
+| Citations per answer | 1.7 | |
+
+A fabricated citation is a bracketed number naming a passage that was never retrieved. There
+were none on either set, and no uncovered question was answered.
+
+The six refusals among covered questions are consistent with the passage accuracy above: 6 of 19
+is 32%, against the 29% of anchored questions whose passage the retriever misses. Retrieval
+failure surfaces as a refusal rather than as a plausible sentence.
+
+The schema is what makes a citation resolvable. A citation names a paper, a paragraph and the
+piece within it, and that triple carries a unique constraint. The arXiv identifier keeps its
+version suffix, so a revised paper is a distinct row rather than a silent overwrite of the text
+a stored citation points at. Long paragraphs are split on sentence boundaries with one sentence
+of overlap, and every piece keeps the index of the paragraph it came from.
+
+## Semantic cache calibration
+
+A cache hit does not save a millisecond, it saves one of the twenty daily requests the free tier
+allows per model. Matching is by embedding similarity, and the measurement says that separates
+the two classes poorly within one field.
+
+| Pairs | Similarity |
+|---|---|
+| The 171 pairs of the question set | 0.496 to 0.723 |
+| Five paraphrases of set questions | 0.766 to 0.974 |
+| An adjacent pair asking different things | **0.823** |
+| One of those paraphrases | **0.733** |
+
+The last two rows are the finding. A pair asking how key rates are computed for two different
+protocol families scores above a genuine paraphrase. Questions in one field share vocabulary, and
+the embedding is dominated by what a question is about rather than by what it asks, so the
+classes overlap and no threshold separates them.
+
+The two errors are not symmetric. A miss spends a request; a false hit answers a different
+question and attaches to it the passages retrieved for the question actually asked. The threshold
+is therefore 0.90, above both measured populations, which admits close rewordings and rejects
+paraphrases that change the vocabulary. Calibrating instead against negatives drawn from
+unrelated fields puts the threshold near 0.70 and admits the 0.823 pair.
+
+## Memory budget
+
+The free tier the service runs on allows 512 MB. Three measured changes place it at 265 MB under
+sustained load.
+
+| | Resident | Startup |
+|---|---:|---:|
+| Library term index, encoders under PyTorch | 1,177 MB | 35.8 s |
+| Term index as a sparse matrix | 479 MB | |
+| Encoders as ONNX graphs | 457 MB | 2.3 s |
+| Encoders quantised to int8 | 275 MB | **1.6 s** |
+| **Sustained load, arena off, 2 pairs per pass** | **265 MB** | |
+
+A resident set sampled between requests is not the budget. ONNX Runtime allocates from an arena
+that retains every block it takes and asks for a new one per tensor shape, so a service seeing
+questions of varying length grows to 1,264 MB under load. Fixed padding widths bound that growth,
+which is what they are for, but only at 1.4 GB, and coarse ones cost compute: rounding a
+320-token batch to 512 raised the resident set to 2,999 MB and retrieval to 5,260 ms.
+
+With the arena disabled, resident sits near 265 MB and the transient allocation during one
+request is governed by how many pairs the cross-encoder scores per forward pass.
+
+| Pairs per pass | Resident | Peak | Retrieval p50 |
+|---|---:|---:|---:|
+| 25 | 275 MB | 836 MB | 3,762 ms |
+| 8 | 266 MB | 458 MB | 2,539 ms |
+| 4 | 255 MB | 341 MB | 1,974 ms |
+| **2** | 265 MB | **372 MB** | **1,108 ms** |
+
+Scoring is independent per pair, so the number in a forward pass changes nothing about the
+result. Smaller passes are also faster here, since they fit the cache better than one large pass.
+The answer path adds the model client and the streaming machinery on top of the retrieval path,
+at 326 MB with two pairs per pass against 455 MB with four.
+
+## Serving
+
+There is no deep learning framework in the serving image. The encoders are exported graphs and
+tokenisation goes through the Rust tokenizer, so the inference stack is `onnxruntime` and
+`tokenizers`, and imports cost 100 MB rather than 434. `torch` writes the graphs and never runs
+them, which is why the image builds in two stages and the first is discarded.
+
+Pooling and normalisation are inside the exported graph rather than reimplemented at call time.
+Both have to agree exactly with what the model was trained under, and a graph carrying them
+cannot drift from a reimplementation. Parity was checked against the original embeddings at
+cosine 1.0 and identical reranker logits.
+
+`POST /search` performs retrieval, reaches no model and consumes no quota. `GET /answer` streams
+server-sent events: the passages first, then the answer, then its resolved citations, so a reader
+sees what the answer is drawn from while it is being written.
+
+Generating an answer needs a key, which the caller sends in `X-Api-Key`. The free tier allows
+twenty requests per model per day, so a public demo answering with the host's key would be spent
+by early afternoon. Retrieval stays open because it reaches no model at all, and a key configured
+on the server is used when the header is absent.
+
+## Deployment
+
+| Component | Host |
+|---|---|
+| API | Render |
+| Corpus | Neon, Postgres with `pgvector` |
+| Client | Vercel |
+
+The corpus is moved rather than rebuilt, since re-ingesting means fetching three hundred sources
+from arXiv again at the three-second delay the API asks between requests. The local database is
+dumped and restored instead.
+
+Both the migration and the restore go through Neon's direct endpoint rather than the pooled one.
+`pg_dump` opens its script with a session-level `set_config('search_path', '', false)`, and a
+pooler working in transaction mode hands the same server connection to the next client, which
+inherits that empty search path and cannot resolve an unqualified table name. The application
+uses the pooled endpoint, where it issues only ordinary queries.
+
+The client is a Next.js page over the same two endpoints. Citations in the answer are controls
+that reveal the passage they name, and a citation the service could not resolve is marked rather
+than rendered. The visitor's key is held in browser storage, sent only with their own requests,
+and read through `useSyncExternalStore` so the prerendered markup and the first client render
+agree on an empty value.
+
+## Testing
+
+The suite contains 87 Python tests and 6 in the client. No test reaches the network, the database
+or a model. The event-stream reader is separated from the component and tested against both CRLF
+and LF terminators, which the specification permits and implementations differ on. CI applies the
+migration against a `pgvector` service container, since the schema declares a vector column a
+plain Postgres image cannot create.

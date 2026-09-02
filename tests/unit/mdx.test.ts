@@ -77,8 +77,8 @@ describe("the project content directory", () => {
     expect(() => getProjectBySlug("no-such-project")).toThrow();
   });
 
-  it("leads with the quantum work", () => {
-    expect(getAllProjects()[0].slug).toBe("bb84-simulation");
+  it("leads with the retrieval work", () => {
+    expect(getAllProjects()[0].slug).toBe("research-copilot");
   });
 
   it("returns only featured projects, capped", () => {

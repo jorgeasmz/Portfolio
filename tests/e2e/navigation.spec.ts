@@ -1,6 +1,13 @@
+import { readdirSync } from "node:fs";
+
 import { expect, test } from "@playwright/test";
 
-test("the landing page leads with the quantum project", async ({ page }) => {
+// Counted from the content directory so a new entry does not need this file edited.
+const PROJECT_COUNT = readdirSync("content/projects").filter((file) =>
+  file.endsWith(".mdx")
+).length;
+
+test("the landing page leads with the retrieval project", async ({ page }) => {
   await page.goto("/");
 
   await expect(page.getByRole("heading", { level: 1 })).toContainText(
@@ -8,15 +15,15 @@ test("the landing page leads with the quantum project", async ({ page }) => {
   );
 
   const featured = page.locator("#projects").getByRole("heading", { level: 3 });
-  await expect(featured.first()).toContainText("BB84");
+  await expect(featured.first()).toContainText("Research Copilot");
 });
 
-test("every project is listed, with the quantum one first", async ({ page }) => {
+test("every project is listed, with the retrieval one first", async ({ page }) => {
   await page.goto("/projects");
 
   const titles = page.getByRole("heading", { level: 3 });
-  await expect(titles).toHaveCount(5);
-  await expect(titles.first()).toContainText("BB84");
+  await expect(titles).toHaveCount(PROJECT_COUNT);
+  await expect(titles.first()).toContainText("Research Copilot");
 });
 
 test("a card opens its project page", async ({ page }) => {

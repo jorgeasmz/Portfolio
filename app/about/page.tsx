@@ -1,209 +1,185 @@
-
 import { TechBadge } from "@/components/ui/TechBadge";
-import { SkillRadar } from "@/components/ui/visualizations/SkillRadar";
-import { ActivityGraph } from "@/components/ui/visualizations/ActivityGraph";
+
+type Role = {
+  title: string;
+  organisation?: string;
+  period?: string;
+  place?: string;
+  points?: string[];
+};
+
+const HISTORY: Role[] = [
+  {
+    title: "Globalink Research Intern",
+    organisation: "Mitacs, University of Lethbridge",
+    period: "Jun 2025 - Sep 2025",
+    place: "Lethbridge, Canada",
+    points: [
+      "Research work entitled “Quantum Accelerated Approximation Algorithms”.",
+      "Implementation and simulation of quantum algorithms including the SWAP Test and VQLS.",
+      "Noise models to run those algorithms under realistic hardware conditions.",
+      "Neural networks and support vector machines applied to denoising the resulting data.",
+    ],
+  },
+  {
+    title: "Research Assistant",
+    organisation: "CIBioFI, Universidad del Valle",
+    period: "Aug 2023 - May 2025",
+    place: "Cali, Colombia",
+    points: [
+      "Research work entitled “Use of Decoy States for Increasing Security in a Quantum Key Distribution Protocol”.",
+      "FPGA programmed as the photon counting electronics of an optical setup.",
+      "Simulation of the BB84 protocol, and of BB84 with vacuum and weak decoy states.",
+      "Implementation of the optical setup in the Optics and Quantum Information Laboratory.",
+    ],
+  },
+  {
+    title: "B.S. Systems Engineering",
+    organisation: "Universidad del Valle",
+    period: "Aug 2020 - Nov 2025",
+    place: "GPA 4.5 / 5.0",
+  },
+  {
+    title: "B.S. Physics",
+    organisation: "Universidad del Valle",
+    period: "Feb 2023 - expected 2027",
+    place: "GPA 4.1 / 5.0",
+  },
+];
+
+const FOCUS = [
+  {
+    title: "Machine learning systems in production",
+    body: "Most of what decides whether a model is useful happens after it is trained. I work on the parts that carry that weight: what a service costs in memory once it is actually serving, and whether the number it reports still holds months later.",
+  },
+  {
+    title: "Retrieval and grounded generation",
+    body: "A language model is only as good as what it was handed, so the interesting work sits in the retrieval and in tying every claim back to the paragraph it came from. Whether that works is a question for a benchmark with relevance judgements, not for a few examples that happen to read well.",
+  },
+  {
+    title: "Quantum key distribution",
+    body: "BB84 with vacuum and weak decoy states, which is the subject of my thesis. The protocol is simple enough to write in an afternoon and hard enough to break the moment real hardware is involved, which is where the decoy states earn their place.",
+  },
+  {
+    title: "Model interpretability",
+    body: "When a decision costs someone something, scoring well is not enough on its own. What matters then is whether the reasons behind it can be put in front of the person it was made about, which is a different requirement and often a harder one.",
+  },
+];
+
+const SKILLS: { heading: string; items: string[] }[] = [
+  {
+    heading: "Machine learning and data",
+    items: ["Python", "scikit-learn", "PyTorch", "Transformers", "pandas", "NumPy", "SciPy", "SQL"],
+  },
+  {
+    heading: "Services and infrastructure",
+    items: ["FastAPI", "PostgreSQL", "Redis", "Docker", "ONNX Runtime", "MLflow", "GitHub", "Linux"],
+  },
+  {
+    heading: "Web",
+    items: ["Next.js", "React", "TypeScript", "Tailwind CSS", "Django", "Express"],
+  },
+  {
+    heading: "Quantum computing",
+    items: ["Qiskit", "PennyLane", "Cirq", "IBM Quantum"],
+  },
+  {
+    heading: "Academic exposure",
+    items: ["C/C++", "C#", "Java", "Racket", "MiniZinc", "OpenGL", "QT", "Pygame"],
+  },
+  {
+    heading: "Practices",
+    items: ["CI/CD", "Agile", "Scrum", "TDD", "Jira"],
+  },
+];
+
+const LANGUAGES = "Spanish (native), English (advanced).";
 
 export default function AboutPage() {
   return (
     <main className="container mx-auto max-w-3xl py-24 px-6 min-h-[80vh]">
       <h1 className="text-4xl font-bold tracking-tight text-foreground sm:text-5xl mb-8">
-        About Me
+        About
       </h1>
-      
-      <div className="prose prose-lg dark:prose-invert text-muted-foreground">
-        <p>
-          My journey into technology hasn&apos;t been a straight line, but rather a superposition of two passions: 
-          <strong> Physics</strong> and <strong>Computer Science</strong>.
-        </p>
-        <p>
-          I graduated as a Systems Engineer in November 2025. However, I&apos;ve been also pursuing a second degree in Physics since January 2023, driven by a desire to understand the way the universe works at its most fundamental level.
-        </p>
-        <p>
-          My main goal is to merge these two fields either theoretically or experimentally through research in areas like <strong>Quantum Computing</strong> and <strong>Quantum Information</strong>. Nonetheless, I also enjoy applying my skills in building scalable software solutions, whether it&apos;s web applications or data pipelines.
-        </p>
-        
-        <div className="flex justify-center w-full md:w-4/5 mx-auto">
-           <SkillRadar />
-        </div>
 
-        <h2 className="text-foreground mt-12 mb-6">Experience & Education</h2>
+      <div className="prose prose-lg prose-invert text-muted-foreground">
+        <p>
+          I am a software engineer in Cali, Colombia. I finished a degree in Systems
+          Engineering at Universidad del Valle in November 2025, having started a second one in
+          Physics there two years before finishing the first, which I expect to complete in
+          2027.
+        </p>
+        <p>
+          My work is in machine learning systems, and more in what surrounds a model than in
+          the model itself: the service that has to hold a memory budget, the features that
+          must come out identical whether a pipeline or a live stream computed them, the
+          threshold that stops meaning what it meant a few months after it was set. Each
+          project here is written up with the measurements behind it.
+        </p>
+        <p>
+          The physics is not a separate track. Two years at CIBioFI went into quantum key
+          distribution, from the simulation down to the optical bench and the FPGA that counted
+          the photons, and a summer at the University of Lethbridge went into quantum
+          algorithms under realistic noise, where cleaning up the results turned into a machine
+          learning problem again.
+        </p>
+
+        <h2 className="text-foreground mt-12 mb-6">Experience and education</h2>
         <ul className="list-none pl-0 space-y-8">
-            <li className="relative pl-6 border-l-2 border-primary/30">
-                <div className="absolute -left-[5px] top-2 h-2.5 w-2.5 rounded-full bg-primary" />
-                <h3 className="text-lg font-semibold text-foreground">Globalink Research Intern</h3>
-                <p className="text-muted-foreground font-medium">Mitacs, University of Lethbridge</p>
-                <div className="text-sm text-muted-foreground mb-3 flex flex-wrap gap-x-4">
-                    <span>Jun 2025 - Sep 2025</span>
-                    <span>•</span>
-                    <span>Lethbridge, Canada</span>
-                </div>
+          {HISTORY.map((role) => (
+            <li key={role.title} className="relative pl-6 border-l-2 border-primary/30">
+              <div className="absolute -left-[5px] top-2 h-2.5 w-2.5 rounded-full bg-primary" />
+              <h3 className="text-lg font-semibold text-foreground">{role.title}</h3>
+              {role.organisation && (
+                <p className="text-muted-foreground font-medium">{role.organisation}</p>
+              )}
+              <div className="text-sm text-muted-foreground mb-3 flex flex-wrap gap-x-4">
+                {role.period && <span>{role.period}</span>}
+                {role.place && <span>&bull;</span>}
+                {role.place && <span>{role.place}</span>}
+              </div>
+              {role.points && (
                 <ul className="list-disc pl-4 space-y-1 text-sm text-muted-foreground">
-                    <li>Research work entitled &quot;Quantum Accelerated Approximation Algorithms&quot;.</li>
-                    <li>Understanding and implementation of quantum algorithms such as SWAP Test and VQLS.</li>
-                    <li>Simulation of quantum algorithms on local devices to solve computational problems.</li>
-                    <li>Use of noise models to simulate quantum algorithms under realistic conditions.</li>
-                    <li>Implementation of Machine Learning models such as Neural Networks and Support Vector Machines to denoise data.</li>
+                  {role.points.map((point) => (
+                    <li key={point}>{point}</li>
+                  ))}
                 </ul>
+              )}
             </li>
-
-            <li className="relative pl-6 border-l-2 border-primary/30">
-                <div className="absolute -left-[5px] top-2 h-2.5 w-2.5 rounded-full bg-primary" />
-                <h3 className="text-lg font-semibold text-foreground">Research Assistant</h3>
-                <p className="text-muted-foreground font-medium">CIBioFI, Universidad del Valle</p>
-                <div className="text-sm text-muted-foreground mb-3 flex flex-wrap gap-x-4">
-                    <span>Aug 2023 - May 2025</span>
-                    <span>•</span>
-                    <span>Cali, Colombia</span>
-                </div>
-                <ul className="list-disc pl-4 space-y-1 text-sm text-muted-foreground">
-                    <li>Research work entitled &quot;Use of Decoy States for Increasing Security in a Quantum Key Distribution Protocol&quot;.</li>
-                    <li>Programming an FPGA as an electronic device for photon counting in an optical setup.</li>
-                    <li>Development of a computational simulation of the BB84 QKD protocol.</li>
-                    <li>Development of a computational simulation of the Decoy States BB84 QKD protocol.</li>
-                    <li>Implementation of the optical setup for a QKD system in the Optics and Quantum Information Laboratory.</li>
-                </ul>
-            </li>
-
-            <li className="relative pl-6 border-l-2 border-primary/30">
-                <div className="absolute -left-[5px] top-2 h-2.5 w-2.5 rounded-full bg-primary" />
-                <h3 className="text-lg font-semibold text-foreground">B.Sc. Systems Engineering</h3>
-                <p className="text-sm text-muted-foreground">Graduated Nov 2025</p>
-            </li>
-            
-             <li className="relative pl-6 border-l-2 border-primary/30">
-                <div className="absolute -left-[5px] top-2 h-2.5 w-2.5 rounded-full bg-primary" />
-                <h3 className="text-lg font-semibold text-foreground">B.Sc. Physics</h3>
-                <p className="text-sm text-muted-foreground">In Progress</p>
-            </li>
+          ))}
         </ul>
 
-        <div className="mt-12">
-            <ActivityGraph />
+        <h2 className="text-foreground mt-12 mb-6">Current focus</h2>
+        <div className="space-y-6 not-prose">
+          {FOCUS.map((item) => (
+            <div key={item.title} className="border-l-2 border-border pl-5">
+              <h3 className="text-base font-semibold text-foreground">{item.title}</h3>
+              <p className="mt-1 text-muted-foreground">{item.body}</p>
+            </div>
+          ))}
         </div>
 
-        <h2 className="text-foreground mt-12 mb-6">Interests</h2>
-        <p>
-            Beyond the IDE and the Lab, I am deeply interested in:
+        <h2 className="text-foreground mt-12 mb-6">Technical skills</h2>
+        <div className="space-y-6 not-prose">
+          {SKILLS.map((group) => (
+            <div key={group.heading}>
+              <h3 className="text-sm font-medium uppercase tracking-wide text-muted-foreground mb-3">
+                {group.heading}
+              </h3>
+              <div className="flex flex-wrap gap-2">
+                {group.items.map((item) => (
+                  <TechBadge key={item} name={item} />
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+        <p className="mt-6 text-sm">
+          The last group is coursework rather than delivered work, and is listed as such.
         </p>
-        <ul className="grid grid-cols-1 sm:grid-cols-2 gap-4 list-none pl-0 mt-4">
-             <li className="flex items-center gap-2">
-                ⚛️ <span>Quantum Computing</span>
-            </li>
-             <li className="flex items-center gap-2">
-                🔭 <span>Algorithms Analysis & Design</span>
-            </li>
-             <li className="flex items-center gap-2">
-                🧠 <span>Neural Network Interpretability</span>
-            </li>
-             <li className="flex items-center gap-2">
-                📚 <span>Technical Research</span>
-            </li>
-        </ul>
 
-        <h2 className="text-foreground mt-12 mb-6">Technical Skills</h2>
-        <div className="space-y-6">
-          <div>
-            <h3 className="text-lg font-medium mb-3 text-foreground">Programming Languages</h3>
-            <div className="flex flex-wrap gap-2">
-              <TechBadge name="PHP" />
-              <TechBadge name="JavaScript" />
-              <TechBadge name="C/C++" />
-              <TechBadge name="C#" />
-              <TechBadge name="Java" />
-              <TechBadge name="Python" />
-              <TechBadge name="Racket" />
-              <TechBadge name="MiniZinc" />
-            </div>
-          </div>
-
-          <div>
-            <h3 className="text-lg font-medium mb-3 text-foreground">Web Development</h3>
-            <div className="flex flex-wrap gap-2">
-              <TechBadge name="AngularJS" />
-              <TechBadge name="React" />
-              <TechBadge name="Express" />
-              <TechBadge name="Django" />
-              <TechBadge name="FastAPI" />
-              <TechBadge name=".NET" />
-            </div>
-          </div>
-
-          <div>
-            <h3 className="text-lg font-medium mb-3 text-foreground">Databases</h3>
-            <div className="flex flex-wrap gap-2">
-              <TechBadge name="MySQL" />
-              <TechBadge name="PostgreSQL" />
-              <TechBadge name="SQLite" />
-              <TechBadge name="MariaDB" />
-            </div>
-          </div>
-
-          <div>
-            <h3 className="text-lg font-medium mb-3 text-foreground">Desktop GUI</h3>
-            <div className="flex flex-wrap gap-2">
-              <TechBadge name="OpenGL" />
-              <TechBadge name="GTK" />
-              <TechBadge name="QT" />
-              <TechBadge name="Swing" />
-              <TechBadge name="Tkinter" />
-              <TechBadge name="Pygame" />
-            </div>
-          </div>
-
-          <div>
-            <h3 className="text-lg font-medium mb-3 text-foreground">Data Science</h3>
-            <div className="flex flex-wrap gap-2">
-              <TechBadge name="Numpy" />
-              <TechBadge name="Scipy" />
-              <TechBadge name="Pandas" />
-              <TechBadge name="Matplotlib" />
-              <TechBadge name="Seaborn" />
-            </div>
-          </div>
-
-          <div>
-            <h3 className="text-lg font-medium mb-3 text-foreground">Machine Learning & NLP</h3>
-            <div className="flex flex-wrap gap-2">
-              <TechBadge name="scikit-learn" />
-              <TechBadge name="TensorFlow" />
-              <TechBadge name="Pytorch" />
-            </div>
-          </div>
-
-          <div>
-            <h3 className="text-lg font-medium mb-3 text-foreground">Quantum Computing</h3>
-            <div className="flex flex-wrap gap-2">
-              <TechBadge name="Qiskit" />
-              <TechBadge name="IBM Quantum" />
-              <TechBadge name="Cirq" />
-              <TechBadge name="PennyLane" />
-            </div>
-          </div>
-
-          <div>
-            <h3 className="text-lg font-medium mb-3 text-foreground">Tools</h3>
-            <div className="flex flex-wrap gap-2">
-              <TechBadge name="git" />
-              <TechBadge name="Docker" />
-              <TechBadge name="kubernetes" />
-              <TechBadge name="Jira" />
-              <TechBadge name="Linux" />
-            </div>
-          </div>
-        </div>
-
-        <h2 className="text-foreground mt-12 mb-6">Methodologies</h2>
-        <div className="space-y-6">
-          <div>
-            <h3 className="text-lg font-medium mb-3 text-foreground">Software Development</h3>
-            <div className="flex flex-wrap gap-2">
-               <TechBadge name="CI/CD" />
-               <TechBadge name="Agile" />
-               <TechBadge name="Scrum" />
-               <TechBadge name="DevOps" />
-            </div>
-          </div>
-        </div>
+        <h2 className="text-foreground mt-12 mb-6">Languages</h2>
+        <p className="not-prose text-muted-foreground">{LANGUAGES}</p>
       </div>
     </main>
   );

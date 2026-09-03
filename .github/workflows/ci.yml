@@ -14,7 +14,9 @@ jobs:
 
       - uses: actions/setup-node@v7
         with:
-          node-version: "22"
+          # Read from .nvmrc, so CI resolves the dependency tree with the same npm
+          # that wrote the lock file. A different major rejects it as out of sync.
+          node-version-file: .nvmrc
           cache: npm
 
       - run: npm ci
@@ -40,7 +42,9 @@ jobs:
 
       - uses: actions/setup-node@v7
         with:
-          node-version: "22"
+          # Read from .nvmrc, so CI resolves the dependency tree with the same npm
+          # that wrote the lock file. A different major rejects it as out of sync.
+          node-version-file: .nvmrc
           cache: npm
 
       - run: npm ci

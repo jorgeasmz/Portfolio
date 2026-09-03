@@ -34,33 +34,35 @@ const HISTORY: Role[] = [
     ],
   },
   {
-    title: "B.Sc. Systems Engineering",
+    title: "B.S. Systems Engineering",
     organisation: "Universidad del Valle",
-    period: "Graduated Nov 2025",
+    period: "Aug 2020 - Nov 2025",
+    place: "GPA 4.5 / 5.0",
   },
   {
-    title: "B.Sc. Physics",
+    title: "B.S. Physics",
     organisation: "Universidad del Valle",
-    period: "In progress since Jan 2023",
+    period: "Feb 2023 - expected 2027",
+    place: "GPA 4.1 / 5.0",
   },
 ];
 
 const FOCUS = [
   {
     title: "Machine learning systems in production",
-    body: "Quantisation and memory budgets, feature computation that has to agree between a batch pipeline and a live one, and what becomes of an operating point months after it was calibrated.",
+    body: "Most of what decides whether a model is useful happens after it is trained. I work on the parts that carry that weight: what a service costs in memory once it is actually serving, and whether the number it reports still holds months later.",
   },
   {
     title: "Retrieval and grounded generation",
-    body: "Hybrid retrieval with cross-encoder reranking, citations resolved back to the paragraph they came from, and evaluation against relevance judgements rather than against examples that happen to work.",
+    body: "A language model is only as good as what it was handed, so the interesting work sits in the retrieval and in tying every claim back to the paragraph it came from. Whether that works is a question for a benchmark with relevance judgements, not for a few examples that happen to read well.",
   },
   {
     title: "Quantum key distribution",
-    body: "BB84 with vacuum and weak decoy states, simulated in Qiskit and implemented on an optical bench, which is the subject of my thesis.",
+    body: "BB84 with vacuum and weak decoy states, which is the subject of my thesis. The protocol is simple enough to write in an afternoon and hard enough to break the moment real hardware is involved, which is where the decoy states earn their place.",
   },
   {
     title: "Model interpretability",
-    body: "Per-feature attribution on decisions that carry a cost, and the distance between a model that scores well and one whose reasons can be shown to the person it decided about.",
+    body: "When a decision costs someone something, scoring well is not enough on its own. What matters then is whether the reasons behind it can be put in front of the person it was made about, which is a different requirement and often a harder one.",
   },
 ];
 
@@ -87,9 +89,11 @@ const SKILLS: { heading: string; items: string[] }[] = [
   },
   {
     heading: "Practices",
-    items: ["CI/CD", "Agile", "Scrum", "Jira"],
+    items: ["CI/CD", "Agile", "Scrum", "TDD", "Jira"],
   },
 ];
+
+const LANGUAGES = "Spanish (native), English (advanced).";
 
 export default function AboutPage() {
   return (
@@ -100,19 +104,24 @@ export default function AboutPage() {
 
       <div className="prose prose-lg prose-invert text-muted-foreground">
         <p>
-          I graduated as a Systems Engineer in November 2025 and have been reading Physics
-          since January 2023. The two degrees run in parallel rather than in sequence, and
-          most of what I build sits where they meet.
+          I am a software engineer in Cali, Colombia. I finished a degree in Systems
+          Engineering at Universidad del Valle in November 2025, having started a second one in
+          Physics there two years before finishing the first, which I expect to complete in
+          2027.
         </p>
         <p>
-          On the engineering side I build machine learning systems and operate them: retrieval
-          pipelines evaluated against judged benchmarks, streaming detectors that hold a fixed
-          memory budget, and the services that put both in front of a reader. On the physics
-          side I work on quantum key distribution, in simulation and on an optical bench.
+          My work is in machine learning systems, and more in what surrounds a model than in
+          the model itself: the service that has to hold a memory budget, the features that
+          must come out identical whether a pipeline or a live stream computed them, the
+          threshold that stops meaning what it meant a few months after it was set. Each
+          project here is written up with the measurements behind it.
         </p>
         <p>
-          Every project listed here states how it was measured, including the figures that are
-          worse than the headline suggests.
+          The physics is not a separate track. Two years at CIBioFI went into quantum key
+          distribution, from the simulation down to the optical bench and the FPGA that counted
+          the photons, and a summer at the University of Lethbridge went into quantum
+          algorithms under realistic noise, where cleaning up the results turned into a machine
+          learning problem again.
         </p>
 
         <h2 className="text-foreground mt-12 mb-6">Experience and education</h2>
@@ -168,6 +177,9 @@ export default function AboutPage() {
         <p className="mt-6 text-sm">
           The last group is coursework rather than delivered work, and is listed as such.
         </p>
+
+        <h2 className="text-foreground mt-12 mb-6">Languages</h2>
+        <p className="not-prose text-muted-foreground">{LANGUAGES}</p>
       </div>
     </main>
   );

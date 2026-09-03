@@ -16,7 +16,7 @@ export function ProjectCard({ project, from }: ProjectCardProps) {
   return (
     <div className="group relative flex h-full flex-col overflow-hidden rounded-xl border border-border bg-card text-card-foreground transition-all hover:border-primary/50 hover:shadow-lg">
 
-      <div className="relative h-48 w-full overflow-hidden bg-muted/20 text-muted-foreground">
+      <div className="relative h-48 w-full overflow-hidden border-b border-border bg-muted/20 text-muted-foreground">
         {project.image ? (
           <Image
             src={project.image}

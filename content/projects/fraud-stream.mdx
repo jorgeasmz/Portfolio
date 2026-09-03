@@ -1,0 +1,211 @@
+---
+title: "Fraud Stream Detection"
+summary: "Scores card transactions as they arrive and ranks them for a team that works a hundred alerts a day, with the batch and streaming feature paths held to producing the same numbers."
+image: "/images/projects/fraud-stream-bg.png"
+techStack: ["Python", "FastAPI", "Redis", "PostgreSQL", "scikit-learn", "Hugging Face", "Next.js", "Docker"]
+demoUrl: "https://fraud-stream-detection.vercel.app"
+repoUrl: "https://github.com/jorgeasmz/Fraud-Stream-Detection"
+date: "2026-09-03"
+featured: true
+order: 2
+---
+
+## Corpus and fraud patterns
+
+The transactions come from the simulator published with the Fraud Detection Handbook
+(Le Borgne and Bontempi, Université Libre de Bruxelles): 1,754,155 transactions over
+183 days, 14,681 of them fraudulent, a rate of 0.837%.
+
+A simulator is used rather than either public card-fraud dataset because both carry
+anonymised principal components and no entity identifier. The features this system
+exists to compute are windowed per card and per terminal, and a table of components
+cannot express them.
+
+Every fraud carries the pattern that produced it, and the three differ in what makes
+them visible.
+
+| Pattern | Frauds | Signature |
+|---|---:|---|
+| Amount | 973 | Every one above 220, which no legitimate transaction reaches |
+| Terminal | 9,077 | 357 terminals compromised for a median of 26 days, at amounts averaging 53.81 against 52.98 for legitimate traffic |
+| Card | 4,631 | 487 cards compromised for a median of 11 days, at amounts averaging 260.92 |
+
+The compromised terminal is 62% of all frauds and its transactions are ordinary by
+amount. That is what places a ceiling on any detector fitted without labels, and
+reporting recall per pattern rather than one aggregate is what makes the ceiling
+visible.
+
+## Feature contract
+
+Eighteen features per transaction from the transaction stream alone: the amount, the
+hour, a weekend flag, and rolling counts and mean amounts per card and per terminal
+over 1, 7 and 30 days, plus the ratio of the amount to the card's window mean. Twelve
+more come from past fraud labels, as rates per card and per terminal over the same
+windows.
+
+Every window is prior-only. A scorer running on an arriving transaction has not seen
+that transaction, so including it in its own window would report a quality the live
+path cannot reach.
+
+A label arrives when a dispute resolves, not when the transaction happens, so every
+label-derived window ends seven days before the transaction it describes. The
+evaluation refuses to run a detector that declares itself label-free while reading
+one of those columns.
+
+## Detector comparison
+
+Fitted on 872,795 transactions and scored on the following 813,843, at a budget of
+100 alerts a day.
+
+| Detector | Labels | Card p@100 | p@100 | Amount | Terminal | Card |
+|---|:---:|---:|---:|---:|---:|---:|
+| `random` | | 0.026 | 0.007 | 0.009 | 0.009 | 0.008 |
+| `amount` | | 0.183 | 0.209 | **1.000** | 0.011 | 0.576 |
+| `deviation` | | 0.219 | 0.266 | 0.909 | 0.007 | 0.815 |
+| `isolation_forest`, 18 features | | 0.186 | 0.212 | 0.417 | 0.007 | 0.707 |
+| `isolation_forest`, 4 features | | 0.218 | 0.265 | 0.998 | 0.008 | 0.791 |
+| `supervised`, label-free features | ✓ | 0.226 | 0.286 | 0.982 | 0.007 | 0.878 |
+| **`supervised`, with delayed risk** | ✓ | **0.561** | **0.620** | 0.916 | **0.664** | 0.819 |
+
+The last three columns are recall per fraud pattern at the same budget.
+
+The isolation forest over all eighteen features scores below ranking by a single one.
+Restricting it to the amount and the three deviation ratios raises p@100 from 0.212 to
+0.265 and amount-pattern recall from 0.417 to 0.998. An isolation score measures
+rarity across every dimension it is given, and terminal activity and hour of day are
+rare in ways unrelated to fraud, so each uninformative dimension dilutes the signal.
+Dropping the six terminal features alone recovers 0.254.
+
+No label-free detector exceeds 0.011 recall on the compromised terminal, which is
+chance at this budget. Delayed labels are the only thing that reaches it: the terminal
+risk of such a fraud averages 0.612 against 0.005 for legitimate traffic, and the
+twelve risk columns take that recall to 0.664 and p@100 from 0.286 to 0.620.
+
+## Operating point
+
+A review team is a rate rather than a probability, so the threshold is the quantile of
+the training scores whose expected alert rate equals the budget. It is an output of
+the fit, recorded beside the model.
+
+The figure that headline metric reports is not the one a deployment reaches.
+
+| | Alerts a day | Precision |
+|---|---:|---:|
+| Ranking each finished day, top 100 | 100 | 0.620 |
+| **Fixed operating point** | **120** | **0.532** |
+
+Ranking a completed day is not available to a live service: it decides on a
+transaction when it arrives, with no view of the rest of the day. Reporting only the
+ranked figure overstates the served result by 0.088.
+
+The operating point also overshoots its budget. It is a quantile of the training
+scores, and the distribution moves over the following months, so the same threshold
+emits between 94 and 146 alerts a day with a median of 119. Both figures are written
+into the artifact and into the model card generated from it, rather than left to be
+discovered in production.
+
+## Batch and streaming parity
+
+The features are computed twice: in batch over a table for fitting, and incrementally
+from Redis for scoring. A detector fitted on one and served by the other is fitted on
+a quantity the live path never produces, so a test replays a sequence through both and
+asserts every column agrees.
+
+It found a divergence in 98 of 400 rows. Where a card has no history in a window the
+deviation ratio is undefined, and the two paths had resolved that differently: the
+batch one reported zero as a consequence of how missing values cascaded, the streaming
+one reported the raw amount. The rule is now stated once in each path instead of
+falling out of null handling.
+
+## Window state
+
+A window is one packed binary string per entity: four bytes of timestamp and four of
+amount for a transaction, four and one for an outcome. A sorted set expresses the same
+window and costs 33.4 bytes an entry against 8.
+
+| | Sorted sets | Packed strings |
+|---|---:|---:|
+| Redis resident | 33.22 MB | **11.91 MB** |
+| Load of 288,163 transactions and 287,618 labels | 107 s | **1.1 s** |
+
+The 25 MB a free key-value instance offers is what makes the encoding a decision
+rather than a preference. The loading time is a separate result: the packed form is
+built once per entity and written in one command, where the sorted set was filled a
+transaction at a time. In deployment, with both streams alongside the windows, the
+instance holds 12.47 MB and peaks at 13.18.
+
+## Backpressure
+
+The producer paces itself against the consumer rather than against the clock alone.
+Measured on the deployment, the consumer advances simulated time at about 300 times
+real time, against the 600 the producer was configured for, because Redis and
+PostgreSQL are a network hop away there. The stream is capped, so a producer that
+stays further ahead than the cap does not queue work, it discards it: the oldest
+unread entries are trimmed to make room.
+
+The producer therefore waits whenever the consumer group has more than 5,000 entries
+it has not read, which turns the configured rate into a ceiling and lets the replay
+run at whatever the consumer sustains. Driven with no rate limit at all it held back
+41 seconds over 37,834 events, and the group read every one of them.
+
+Redis reports the group's lag as unknown once entries have been trimmed. Read as zero,
+that disables the throttle exactly when the stream is full, so it is treated as
+unknown and the producer does not throttle on a figure it does not have.
+
+## Memory budget
+
+The service runs on 512 MB, and the constraint is the startup rather than the scoring.
+
+| | |
+|---|---:|
+| Replay slice | 421,807 rows, 46 MB |
+| Read in one query | 456 MB while it materialises |
+| **Read in pieces of 25,000** | **187 MB** |
+| Resident in deployment | 304 MB |
+| Peak in deployment | 326 MB |
+
+The frame that slice produces holds 13 MB. The 456 are the materialisation, and alone
+they exceed what the plan allows. Streaming the read holds the transient to 187 MB and
+is no slower.
+
+Memory is flat through a replay. Scoring adds nothing to the peak, since a window is a
+packed string of a few hundred bytes read whole and filtered in process, so no request
+allocates in proportion to the corpus.
+
+## Serving
+
+Neither the corpus nor the detector is in the repository. A free instance has no
+persistent disk, so the 103 MB of source files a local run downloads would be fetched
+again on every restart. The rows a replay and its warm-up need are loaded into
+PostgreSQL once, and the fitted detector is published as a model repository whose card
+is generated from the run that produced it.
+
+The serving install carries neither the parquet reader nor the downloader, since the
+deployment reads its slice from PostgreSQL and never touches a file. That is 485 MB
+against 641 MB.
+
+Transactions and resolved labels travel on one stream read by one consumer group.
+Their relative order carries meaning, and two streams read in one call are ordered per
+stream rather than by time. An alert is acknowledged after it is written, so a crash
+between the two redelivers the message, and the insert ignores a transaction already in
+the queue.
+
+Per-event latency is 1.74 ms at the median on one machine and 5.5 ms in deployment,
+where every window read crosses a network.
+
+## Client
+
+A Next.js panel over the queue, the summary and a socket. The queue returns numbers and
+the stream returns strings, since Redis fields are text; both are read into one shape
+before anything renders, and a test asserts the two produce the same alert.
+
+An arriving alert is merged by transaction rather than appended, because a consumer
+group delivers at least once. A closed socket is reopened rather than reported, since a
+free instance sleeps and a disconnection is the normal state of an idle demo.
+
+## Testing
+
+Seventy-five tests run offline, three more against PostgreSQL in CI, and thirteen in the
+client. No test in the default run reaches the network, the corpus or a database. The
+window tests assert the prior-only property on hand-built frames of two transactions,
+where the expected value is arithmetic rather than a recorded output.

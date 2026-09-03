@@ -21,6 +21,7 @@ import {
   SiHuggingface,
   SiOnnx,
   SiMlflow,
+  SiRedis,
   SiLanggraph,
   SiGooglegemini,
   SiFastapi,
@@ -77,6 +78,7 @@ const iconMap: Record<string, IconType | LucideIcon> = {
   "sqlite": SiSqlite,
   "mariadb": SiMariadb,
   "mongodb": SiMongodb,
+  "redis": SiRedis,
 
   // Desktop GUI
   "opengl": SiOpengl,

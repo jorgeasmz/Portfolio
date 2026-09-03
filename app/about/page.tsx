@@ -42,27 +42,8 @@ const HISTORY: Role[] = [
   {
     title: "B.S. Physics",
     organisation: "Universidad del Valle",
-    period: "Feb 2023 - expected 2027",
+    period: "Feb 2023 - Expected 2027",
     place: "GPA 4.1 / 5.0",
-  },
-];
-
-const FOCUS = [
-  {
-    title: "Machine learning systems in production",
-    body: "Most of what decides whether a model is useful happens after it is trained. I work on the parts that carry that weight: what a service costs in memory once it is actually serving, and whether the number it reports still holds months later.",
-  },
-  {
-    title: "Retrieval and grounded generation",
-    body: "A language model is only as good as what it was handed, so the interesting work sits in the retrieval and in tying every claim back to the paragraph it came from. Whether that works is a question for a benchmark with relevance judgements, not for a few examples that happen to read well.",
-  },
-  {
-    title: "Quantum key distribution",
-    body: "BB84 with vacuum and weak decoy states, which is the subject of my thesis. The protocol is simple enough to write in an afternoon and hard enough to break the moment real hardware is involved, which is where the decoy states earn their place.",
-  },
-  {
-    title: "Model interpretability",
-    body: "When a decision costs someone something, scoring well is not enough on its own. What matters then is whether the reasons behind it can be put in front of the person it was made about, which is a different requirement and often a harder one.",
   },
 ];
 
@@ -84,7 +65,7 @@ const SKILLS: { heading: string; items: string[] }[] = [
     items: ["Qiskit", "PennyLane", "Cirq", "IBM Quantum"],
   },
   {
-    heading: "Academic exposure",
+    heading: "Also worked with",
     items: ["C/C++", "C#", "Java", "Racket", "MiniZinc", "OpenGL", "QT", "Pygame"],
   },
   {
@@ -104,24 +85,16 @@ export default function AboutPage() {
 
       <div className="prose prose-lg prose-invert text-muted-foreground">
         <p>
-          I am a software engineer in Cali, Colombia. I finished a degree in Systems
+          I am a software engineer from Cali, Colombia. I finished my degree in Systems
           Engineering at Universidad del Valle in November 2025, having started a second one in
           Physics there two years before finishing the first, which I expect to complete in
           2027.
         </p>
         <p>
-          My work is in machine learning systems, and more in what surrounds a model than in
-          the model itself: the service that has to hold a memory budget, the features that
-          must come out identical whether a pipeline or a live stream computed them, the
-          threshold that stops meaning what it meant a few months after it was set. Each
-          project here is written up with the measurements behind it.
-        </p>
-        <p>
-          The physics is not a separate track. Two years at CIBioFI went into quantum key
-          distribution, from the simulation down to the optical bench and the FPGA that counted
-          the photons, and a summer at the University of Lethbridge went into quantum
-          algorithms under realistic noise, where cleaning up the results turned into a machine
-          learning problem again.
+          The two have never been separate in practice. My work is in machine learning systems
+          and in the engineering that keeps them running once they are deployed, and my
+          research is in quantum information, where the measurements have more than once turned
+          out to need the same tools.
         </p>
 
         <h2 className="text-foreground mt-12 mb-6">Experience and education</h2>
@@ -150,14 +123,26 @@ export default function AboutPage() {
         </ul>
 
         <h2 className="text-foreground mt-12 mb-6">Current focus</h2>
-        <div className="space-y-6 not-prose">
-          {FOCUS.map((item) => (
-            <div key={item.title} className="border-l-2 border-border pl-5">
-              <h3 className="text-base font-semibold text-foreground">{item.title}</h3>
-              <p className="mt-1 text-muted-foreground">{item.body}</p>
-            </div>
-          ))}
-        </div>
+        <p>
+          What holds my attention is the part of a system that only appears once it is running.
+          A trained model is a small piece next to the service that has to hold a memory
+          budget, the features that must come out identical whether a pipeline or a live stream
+          produced them, and the threshold that quietly stops meaning what it meant when it was
+          set.
+        </p>
+        <p>
+          The same concern turns up in retrieval, where an answer can only be as good as what
+          the model was handed, so most of the work sits in the retrieval itself and in tying
+          every claim back to the paragraph it came from. It turns up again wherever a decision
+          costs someone something, because scoring well and being able to show the reasons to
+          the person the decision was made about are not the same requirement.
+        </p>
+        <p>
+          On the physics side it is quantum key distribution, and in particular BB84 with
+          vacuum and weak decoy states, which is the subject of my thesis. The protocol is
+          simple enough to write in an afternoon and fragile enough that real hardware breaks
+          it, and that gap is where the decoy states earn their place.
+        </p>
 
         <h2 className="text-foreground mt-12 mb-6">Technical skills</h2>
         <div className="space-y-6 not-prose">
@@ -174,10 +159,6 @@ export default function AboutPage() {
             </div>
           ))}
         </div>
-        <p className="mt-6 text-sm">
-          The last group is coursework rather than delivered work, and is listed as such.
-        </p>
-
         <h2 className="text-foreground mt-12 mb-6">Languages</h2>
         <p className="not-prose text-muted-foreground">{LANGUAGES}</p>
       </div>

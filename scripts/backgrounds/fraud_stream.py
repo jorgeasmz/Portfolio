@@ -1,52 +1,49 @@
-"""Fraud Stream Detection: one held-out day against the operating point.
+"""Fraud Stream Detection: which fraud pattern each set of features can see.
 
-Every transaction of 2018-07-20 scored by the served detector. The dashed rule is
-the threshold written by training, the band below it is ordinary traffic, and the
-points above it are the day's alerts, split by whether the dispute resolved as
-fraud. The scores are real: `fraud_stream_scores.py` writes the file this reads.
+Three rails, one per pattern the simulator injects. The upper fill is the recall
+the detector reaches from the transaction stream alone, the lower one what it
+reaches once features derived from resolved disputes are added. The middle rail is
+the finding: a compromised terminal spends ordinary amounts, so nothing in the
+stream distinguishes it, and only labels that arrive a week late reach it.
+
+Recall at a budget of 100 alerts a day, measured on 813,843 held-out transactions.
 """
 
 from __future__ import annotations
 
-from pathlib import Path
+from palette import DPI, HIT, MUTED, canvas, ground
 
-import pandas as pd
+# (pattern, recall without label-derived features, recall with them)
+PATTERNS = (
+    ("amount", 0.982, 0.916),
+    ("terminal", 0.007, 0.664),
+    ("card", 0.878, 0.819),
+)
 
-from palette import DPI, HIT, MISS, MUTED, RULE, canvas, ground
+LEFT, RIGHT = 0.09, 0.91
+BAR = 0.040
+GAP = 0.034
+CENTRES = (0.76, 0.50, 0.24)
 
-SCORES = Path(__file__).resolve().parent / "data" / "fraud_stream_scores.parquet"
 
-# The operating point recorded in the artifact the deployment serves.
-THRESHOLD = 0.01643005512716834
-
-# The score distribution has its mass against zero, and a fourth root spreads it
-# enough that the threshold sits inside the frame rather than on its floor.
-def height(score):
-    return 0.10 + 0.80 * (score**0.25)
+def rail(axes, centre: float, offset: float, fraction: float, colour: str, alpha: float) -> None:
+    y = centre + offset
+    axes.plot([LEFT, RIGHT], [y, y], color="#c9bdb2", lw=BAR * 200, alpha=0.07,
+              solid_capstyle="round", zorder=2)
+    axes.plot([LEFT, LEFT + (RIGHT - LEFT) * fraction], [y, y], color=colour, lw=BAR * 200,
+              alpha=alpha, solid_capstyle="round", zorder=3)
 
 
 def main() -> None:
-    day = pd.read_parquet(SCORES)
     background = ground("#0d0805", "#1e1109", "#7a3d12", at=(0.72, 0.30), strength=0.17)
     figure, axes, target = canvas(background, "fraud-stream-bg")
 
-    across = 0.05 + 0.90 * (day.t.to_numpy() / day.t.max())
-    down = height(day.score.to_numpy())
-    rule = height(THRESHOLD)
-
-    alerted = day.score.to_numpy() >= THRESHOLD
-    fraud = day.fraud.to_numpy() == 1
-
-    axes.scatter(across[~alerted], down[~alerted], s=3.0, c=MUTED, alpha=0.16, linewidths=0,
-                 zorder=2)
-    axes.plot([0.02, 0.98], [rule, rule], color=RULE, lw=1.1, alpha=0.5, ls=(0, (7, 5)), zorder=3)
-    axes.scatter(across[alerted & ~fraud], down[alerted & ~fraud], s=17, c=MISS, alpha=0.75,
-                 linewidths=0, zorder=4)
-    axes.scatter(across[alerted & fraud], down[alerted & fraud], s=19, c=HIT, alpha=0.92,
-                 linewidths=0, zorder=5)
+    for centre, (_, without, with_labels) in zip(CENTRES, PATTERNS, strict=True):
+        rail(axes, centre, (BAR + GAP) / 2, without, MUTED, 0.55)
+        rail(axes, centre, -(BAR + GAP) / 2, with_labels, HIT, 0.80)
 
     figure.savefig(target, dpi=DPI, facecolor="#0d0805")
-    print(f"{target}  {int(alerted.sum())} alerts, {int((alerted & fraud).sum())} fraudulent")
+    print(target)
 
 
 if __name__ == "__main__":

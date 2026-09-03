@@ -26,11 +26,12 @@ and prints the path it wrote.
 | Image | Figure |
 |---|---|
 | `research-copilot-bg.png` | Ten fused candidates entering on the left and leaving in the order the cross-encoder gives them, with one promoted from ninth to first and one demoted from second to ninth |
-| `fraud-stream-bg.png` | Every transaction of one held-out day against the operating point: ordinary traffic below the rule, and the day's 110 alerts above it split into 61 that resolved as fraud and 49 that did not |
+| `fraud-stream-bg.png` | Recall on each of the three fraud patterns, from the transaction stream alone against the same detector given features derived from resolved disputes. The middle rail is the finding: a compromised terminal spends ordinary amounts, so only the late labels reach it |
 
-The fraud figure is drawn from real scores. `fraud_stream_scores.py` regenerates
-`data/fraud_stream_scores.parquet` from a checkout of Fraud-Stream-Detection with
-its corpus ingested; the file is committed so the image can be redrawn without one.
+The recall figures are the ones the case study reports, held in the script itself.
+`fraud_stream_scores.py` and `data/fraud_stream_scores.parquet` remain for the
+score distribution of a single held-out day, which an earlier draft drew and which
+the evaluation still refers to.
 
 ## Images without a script
 

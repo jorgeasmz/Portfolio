@@ -79,7 +79,7 @@ export default async function ProjectPage({ params }: Props) {
         </div>
 
         {/* The Markdown Content */}
-        <div className="prose prose-lg dark:prose-invert mt-16 max-w-none prose-strong:text-primary">
+        <div className="prose prose-lg prose-invert mt-16 max-w-none prose-strong:text-primary">
            <MDXRemote
              source={content}
              options={{ mdxOptions: { remarkPlugins: [remarkGfm] } }}

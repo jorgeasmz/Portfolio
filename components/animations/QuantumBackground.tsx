@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { useTheme } from "next-themes";
 
 interface Particle {
   x: number;
@@ -13,7 +12,6 @@ interface Particle {
 
 export function QuantumBackground() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const { theme } = useTheme();
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -59,14 +57,9 @@ export function QuantumBackground() {
     const draw = () => {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       
-      const isDark = theme === 'dark' || document.documentElement.classList.contains('dark');
-      
-      // Light mode: Darker slate (Slate-700), higher base opacity
-      const particleColor = isDark ? "rgba(255, 255, 255, 0.5)" : "rgba(51, 65, 85, 0.5)"; 
-      const lineColor = isDark ? "rgba(255, 255, 255," : "rgba(51, 65, 85,";
-      
-      // Light mode lines need much higher opacity to be visible against white
-      const lineOpacityMultiplier = isDark ? 0.15 : 0.45; 
+      const particleColor = "rgba(255, 255, 255, 0.5)";
+      const lineColor = "rgba(255, 255, 255,";
+      const lineOpacityMultiplier = 0.15;
 
       // Update and draw particles
       particles.forEach((p, i) => {
@@ -129,12 +122,12 @@ export function QuantumBackground() {
       window.removeEventListener("mousemove", handleMouseMove);
       cancelAnimationFrame(animationFrameId);
     };
-  }, [theme]);
+  }, []);
 
   return (
     <canvas 
         ref={canvasRef} 
-        className="absolute inset-0 z-0 h-full w-full pointer-events-none opacity-40 dark:mix-blend-screen"
+        className="absolute inset-0 z-0 h-full w-full pointer-events-none opacity-40 mix-blend-screen"
         aria-hidden="true"
     />
   );

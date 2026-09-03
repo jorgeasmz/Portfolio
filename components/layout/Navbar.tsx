@@ -7,7 +7,6 @@ import { SiGithub } from "react-icons/si";
 // SiLinkedin. Font Awesome still carries it.
 import { FaLinkedin } from "react-icons/fa";
 import { Mail, Menu, X } from "lucide-react";
-import { ThemeToggle } from "@/components/ui/ThemeToggle";
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -25,8 +24,9 @@ export function Navbar() {
       <div className="container mx-auto flex h-16 max-w-5xl items-center justify-between px-6">
         <div className="flex items-center gap-8">
           <Link href="/" className="flex items-center space-x-2">
-            <span className="font-bold text-xl tracking-tight">
-              Jorge<span className="text-primary">.dev</span>
+            <span className="text-xl tracking-tight">
+              <span className="font-semibold text-foreground">Jorge</span>{" "}
+              <span className="font-semibold text-primary">Arias</span>
             </span>
           </Link>
           
@@ -49,7 +49,6 @@ export function Navbar() {
         <div className="flex items-center gap-4">
              {/* Desktop Socials */}
             <div className="hidden md:flex items-center gap-4 border-r border-border/40 pr-6">
-                 <ThemeToggle />
                 <Link
                 href="https://github.com/jorgeasmz"
                 target="_blank"
@@ -79,7 +78,6 @@ export function Navbar() {
             
             {/* Mobile Actions */}
             <div className="flex md:hidden items-center gap-4">
-               <ThemeToggle />
                <button
                   className="p-2 text-foreground/60 hover:text-foreground"
                   onClick={() => setIsOpen(!isOpen)}

@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // The background scripts ask for a virtualenv here, and matplotlib ships JS in it.
+    "scripts/backgrounds/venv/**",
   ]),
 ]);
 

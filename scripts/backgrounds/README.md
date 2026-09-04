@@ -16,6 +16,7 @@ pip install -r requirements.txt
 
 python research_copilot.py
 python fraud_stream.py
+python energy_platform.py
 ```
 
 Each script writes into `public/images/projects/`, resolved from its own location,
@@ -27,6 +28,7 @@ and prints the path it wrote.
 |---|---|
 | `research-copilot-bg.png` | Ten fused candidates entering on the left and leaving in the order the cross-encoder gives them, with one promoted from ninth to first and one demoted from second to ninth |
 | `fraud-stream-bg.png` | Recall on each of the three fraud patterns, from the transaction stream alone against the same detector given features derived from resolved disputes. The middle rail is the finding: a compromised terminal spends ordinary amounts, so only the late labels reach it |
+| `energy-platform-bg.png` | The partition grid, six series by 129 months, with the 582 cells that carry a request against the 192 that are empty because a series had not started. The step is where the storage the free tier allows stops paying for a decade of the per-plant grain |
 
 The recall figures are the ones the case study reports, held in the script itself.
 `fraud_stream_scores.py` and `data/fraud_stream_scores.parquet` remain for the

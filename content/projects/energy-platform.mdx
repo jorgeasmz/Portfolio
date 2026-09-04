@@ -1,0 +1,124 @@
+---
+title: "Energy Data Platform"
+summary: "Loads a decade of the Colombian wholesale electricity market into a modelled warehouse, where the shape of the source API sets the partition grain and a measurement of the storage cost sets how much history each series keeps."
+image: "/images/projects/energy-platform-bg.png"
+techStack: ["Python", "Dagster", "dbt", "PostgreSQL", "GitHub Actions", "Docker"]
+demoUrl: "https://energy-data-platform-3aqa.onrender.com"
+repoUrl: "https://github.com/jorgeasmz/Energy-Data-Platform"
+date: "2026-09-03"
+order: 3
+---
+
+## The source sets the grain
+
+XM operates the Colombian wholesale electricity market and publishes an hourly API that needs
+neither a key nor an account. Two properties of it decide most of what follows.
+
+The first is a limit on how much one request may ask for. A 30-day span returns 31 days of data,
+while 45 and 90 return a non-JSON error under a 200 status. A calendar month never spans more
+than thirty days from its first day to its last, so a month is the largest window that always
+fits, and a partition is exactly one request. The grain of the schedule is a property of the
+source rather than a convention chosen for it.
+
+The second is the response shape: one record per date and entity, with the day's twenty-four
+hours packed as `Hour01` through `Hour24`. Nothing unpacks them on the way in. The raw layer
+holds what the API returned, so a change of mind about the model is a rebuild rather than a
+decade of requests repeated.
+
+## Partition grid
+
+Six series, four describing the market as a whole and two carrying a value per generating plant,
+across the 129 months from January 2016. That is 774 partitions, of which 582 carry a request.
+
+The remaining 192 are the months before a series begins. The month dimension is shared by every
+series while each starts on its own date, so a partition outside a series's window materialises
+as empty rather than failing. Treating the absence of data there as an error would report 192
+failures on a grid that is already as complete as it can be.
+
+## The window is a measurement
+
+The two grains differ by a factor of fifty. A system series carries one value an hour; a resource
+series carries one per plant, and 135 plants appear across the loaded window.
+
+Three months of every series were loaded and measured before the window was chosen: 12,858 rows
+and 8.7 MB in the raw layer, almost all of it the resource grain. The system series are cheap
+enough that a decade of them costs 4 MB. The start dates follow from that, 2016 for the market
+and 2024 for its plants, against the 512 MB the database's free tier allows.
+
+| | |
+|---|---:|
+| Database | 264 MB of 512 |
+| Range | 2016-01-01 to 2026-08-31 |
+| Hours of the market | 93,504 |
+| Rows per plant and hour | 2,601,552 |
+| Plants | 135 |
+
+## Reloading costs nothing
+
+The primary key of the raw table is the natural key of the source and a load upserts, so a
+partition holds one copy however many times it is loaded. Loading the same month twice writes
+1,595 rows on each pass and leaves 1,595 rows in the table.
+
+Every partition also writes a row to an audit table, which turns the coverage of a backfill into
+a query rather than a guess, and a run that stops halfway resumes from where it stopped. Over a
+range already held it issues no requests at all. That is not a hypothetical property here: the
+initial load of 582 partitions was interrupted by a network timeout and continued rather than
+restarting. A month the source refuses is reported and the run carries on, so one bad month does
+not abandon the other hundred.
+
+## Contracts
+
+The marts declare their columns and their types, and dbt refuses to build a model whose output
+does not match. That caught a real mismatch on the first build: `days_present` was declared
+`INTEGER` and produced `LONGINTEGER`, because `count(distinct ...)` returns `bigint` in
+PostgreSQL. Without the contract the column would have shipped as a type the documentation did
+not claim, and the consumer would have been the one to find out.
+
+Twenty-four checks run on every build: uniqueness on each grain, a foreign key from the resource
+facts to the plant dimension, ranges on the hour and on the price, and freshness on the source.
+
+## One lineage across two tools
+
+The load is Python and the model is dbt, and the two are one graph rather than two. The Dagster
+asset that carries the raw table declares the key the dbt source resolves to, so the partitioned
+load, the staging model that unpivots the packed hours, and the three marts appear as a single
+lineage from the request to the table a reader queries.
+
+`fct_system_hourly` is the grain another project consumes, so its four measurements are aligned
+into one row per hour there rather than joined at read time.
+
+## Scheduling without a daemon
+
+Dagster's scheduler is a daemon, and a daemon needs a process that runs continuously, which the
+free tier this is deployed on does not offer. The schedule therefore lives in GitHub Actions and
+materialises the same assets through the Dagster CLI.
+
+Calling the assets rather than the loader is what keeps the deployed graph's history populated. A
+pipeline that bypassed its own orchestrator would serve a run page that is permanently empty,
+which is a demonstration of nothing. The exception is a backfill of hundreds of partitions asked
+for by hand, where starting a process per partition would cost more than the fetching; there the
+loader does the work and the materialisation events are reported to Dagster afterwards, so the
+graph still records what happened.
+
+The deployed webserver holds 353 MB against the 512 the plan allows, and keeps its own run
+history in the same database as the warehouse.
+
+## Documentation as a build artefact
+
+`dbt docs generate --static` produces one self-contained file carrying the lineage graph, every
+column, every test and every contract. Building it reads the catalogue from the warehouse, so it
+is generated in CI against the live database and published as a static page rather than served by
+a process that would have to hold a connection. It rebuilds weekly, since the catalogue carries
+row counts and column types that drift with the data.
+
+## Testing
+
+Twenty-six tests run offline and five more against a live warehouse. No test in the default run
+reaches the API or a database. The client is driven by a fake session that returns what the real
+one returns, including the case the API reports as plain text under a 200 status.
+
+The dbt manifest is a build artefact rather than a file in the repository, and the asset graph
+reads it when it is imported, so parsing the dbt project runs before the tests rather than with
+the build. Parsing needs the project and its packages but no database, which is what allows it
+there. CI additionally loads a fixture of one day of every series and builds the warehouse
+against it, so the transformations are exercised on known values rather than only parsed.

@@ -9,7 +9,7 @@ date: "2026-09-03"
 order: 3
 ---
 
-## The source sets the grain
+## Source and its request limit
 
 XM operates the Colombian wholesale electricity market and publishes an hourly API that needs
 neither a key nor an account. Two properties of it decide most of what follows.
@@ -35,7 +35,7 @@ series while each starts on its own date, so a partition outside a series's wind
 as empty rather than failing. Treating the absence of data there as an error would report 192
 failures on a grid that is already as complete as it can be.
 
-## The window is a measurement
+## The warehouse window
 
 The two grains differ by a factor of fifty. A system series carries one value an hour; a resource
 series carries one per plant, and 135 plants appear across the loaded window.
@@ -53,7 +53,7 @@ and 2024 for its plants, against the 512 MB the database's free tier allows.
 | Rows per plant and hour | 2,601,552 |
 | Plants | 135 |
 
-## Reloading costs nothing
+## Idempotency and resumability
 
 The primary key of the raw table is the natural key of the source and a load upserts, so a
 partition holds one copy however many times it is loaded. Loading the same month twice writes
@@ -87,7 +87,7 @@ lineage from the request to the table a reader queries.
 `fct_system_hourly` is the grain another project consumes, so its four measurements are aligned
 into one row per hour there rather than joined at read time.
 
-## Scheduling without a daemon
+## Schedule without a daemon
 
 Dagster's scheduler is a daemon, and a daemon needs a process that runs continuously, which the
 free tier this is deployed on does not offer. The schedule therefore lives in GitHub Actions and

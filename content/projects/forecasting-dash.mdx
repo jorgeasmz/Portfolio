@@ -1,8 +1,8 @@
 ---
 title: "Time-Series Forecasting Service"
-summary: "Backtests four model families against five series with rolling-origin cross-validation, selects one per series and reports interval calibration alongside point accuracy."
+summary: "Backtests four model families against seven series with rolling-origin cross-validation, two of them a decade of Colombian electricity prices read from a warehouse, and reports why a capped training window halved every MASE without improving three of the four models."
 image: "/images/projects/forecasting-bg.png"
-techStack: ["Python", "Prophet", "statsmodels", "LightGBM", "PostgreSQL", "FastAPI"]
+techStack: ["Python", "Prophet", "statsmodels", "LightGBM", "PostgreSQL", "FastAPI", "Streamlit"]
 demoUrl: "https://jorgeasmz-dashboard-forecasting.streamlit.app/"
 repoUrl: "https://github.com/jorgeasmz/Dashboard-Forecasting"
 date: "2024-06-15"
@@ -11,8 +11,8 @@ order: 6
 
 ## Series
 
-Five published series with different structure, stored in PostgreSQL alongside the
-parameters used to model each one.
+Seven series with different structure, stored in PostgreSQL alongside the parameters used
+to model each one.
 
 | Series | Observations | Frequency | Cycle | Horizon |
 |---|---:|---|---:|---:|
@@ -21,28 +21,41 @@ parameters used to model each one.
 | Monthly sunspots | 600 | monthly | 1 | 12 |
 | Daily minimum temperatures | 1,460 | daily | 365 | 28 |
 | Daily female births | 365 | daily | 7 | 14 |
+| Colombian spot price, daily | 3,896 | daily | 7 | 14 |
+| Colombian spot price, hourly | 93,504 | hourly | 24 | 24 |
 
-The sunspot series is modelled as non-seasonal because its cycle runs about 132
-months, which no seasonal term in this configuration can represent.
+The first five are published CSVs. The last two are the same measurement at two grains,
+read from `marts.fct_system_hourly` in the warehouse of a separate project, whose columns
+and types are under an enforced contract there. A column that changes type fails that
+project's build rather than this project's ingestion.
 
-## Evaluation method
+The read happens once, when a series is ingested, and the observations are stored here
+like any other. Nothing the API or the dashboard serves reaches the warehouse, so this
+demo stays up while that database is asleep and a backtest refits without a network round
+trip per fold. Aggregation to the daily grain runs in the warehouse rather than here, so
+that series transfers 3,896 rows instead of 93,504 to compute the same means, and a day
+missing an hour is dropped rather than averaged over fewer values than the rest.
 
-Four model families are evaluated against each series: a seasonal naive baseline,
-Prophet, SARIMA from statsmodels, and LightGBM over lag and calendar features.
-All four implement the same interface and return a point forecast with an 80%
-prediction interval, so the same scoring applies to each.
+## Fitting cost at the hourly grain
 
-Evaluation uses rolling-origin cross-validation. Each fold advances the training
-cutoff by one horizon and refits every model, producing four measurements per
-model and series, or 80 fits in total.
+A fold refits every family, so the length of the training set decides whether a family can
+be compared at all. One fit at a seasonal period of 24:
 
-MAPE is not reported. The series span four orders of magnitude, from single-digit
-temperatures to car sales in the tens of thousands, and two of them contain values
-below 1.0: sunspots reach 0.20 and temperatures 0.50. A five-unit error against an
-observation of 0.20 registers as 2,500%, which would dominate any average
-containing it. MASE divides the mean absolute error by the in-sample mean absolute
-error of the seasonal naive, giving a scale-free figure where 1.0 matches the
-baseline.
+| Training observations | seasonal_naive | lightgbm | prophet | sarima |
+|---:|---:|---:|---:|---:|
+| 2,184 | 0.0 s | 0.4 s | 0.6 s | 18.1 s |
+| 8,760 | 0.0 s | 0.5 s | 3.8 s | 96.6 s |
+| 26,280 | 0.0 s | 0.9 s | 11.9 s | **over 420 s** |
+| 93,504 | 0.0 s | 1.4 s | 39.8 s | not attempted |
+
+SARIMA is the constraint. Its cost grows faster than the series does, and past 26,280
+observations a single fit exceeds seven minutes, which four folds cannot afford. The other
+three are unaffected: LightGBM fits the whole history in 1.4 s.
+
+The hourly series therefore trains each fold on the most recent 8,760 observations rather
+than on everything before the cutoff. That is one year, it holds every fold to the same
+size, and it keeps all four families in the comparison at about four minutes for the
+series.
 
 ## Results
 
@@ -50,16 +63,79 @@ Lowest mean MASE per series across four folds:
 
 | Series | Selected model | MASE | Coverage |
 |---|---|---:|---:|
+| Colombian spot price, daily | sarima | 0.621 | 91% |
 | Daily minimum temperatures | prophet | 0.688 | 75% |
-| Daily female births | prophet | 0.779 | 79% |
+| Daily female births | prophet | 0.779 | 82% |
 | Airline passengers | sarima | 0.794 | 67% |
 | Monthly car sales | seasonal_naive | 0.999 | 100% |
+| Colombian spot price, hourly | seasonal_naive | 1.209 | 100% |
 | Monthly sunspots | lightgbm | 2.041 | 35% |
 
-Three families win across five series, and on one of them no family beats the
-baseline.
+All four families win at least one series. On two of the seven no model reaches the
+in-sample scale of the seasonal naive, and on two the baseline itself is the best forecast.
 
-### Car sales
+The first row is not comparable to the rest, for the reason given under the training window below.
+
+## The hourly spot price
+
+Nothing improves on the baseline.
+
+| Model | MASE | MAE | Coverage |
+|---|---:|---:|---:|
+| **seasonal_naive** | **1.209** | **66.15** | 100% |
+| sarima | 1.210 | 66.23 | 86% |
+| prophet | 1.335 | 73.06 | 92% |
+| lightgbm | 1.553 | 84.97 | 50% |
+
+SARIMA and the baseline are separated by 0.001, which is a tie rather than a ranking, and
+the two families that model a trend are both worse. The same hour of the previous day is a
+strong forecast of this one, and a day-ahead horizon is short enough that little else is
+left to predict.
+
+## Training window and the MASE denominator
+
+The daily series produced the largest result here, and it is a result about the metric
+rather than about the market.
+
+Over the decade the warehouse holds, the level is not stationary: values run from 61.2 to
+2,498.8 and the yearly means from 106 in 2017 to 676 in 2024. Fitted through all of it
+with an expanding window, Prophet extrapolates a linear trend that lands where the series
+does not go. Capping every fold at the most recent three years is the same code with one
+number changed.
+
+| Model | MAE, expanding | MAE, 1,095 days | MASE, expanding | MASE, 1,095 days |
+|---|---:|---:|---:|---:|
+| sarima | 85.53 | **82.06** | 1.199 | **0.621** |
+| seasonal_naive | 108.13 | **108.13** | 1.515 | **0.817** |
+| prophet | 690.62 | **126.30** | 9.679 | **0.955** |
+| lightgbm | 147.58 | **145.12** | 2.070 | **1.096** |
+
+Only one of those rows describes a model that improved. Prophet's absolute error falls by
+more than a factor of five and its interval coverage goes from 0% to 96%, which is the
+failure being fixed: 0% coverage is a stronger statement than a wide interval, since not
+one held-out day fell inside the band. The other three barely move. SARIMA gains 4%,
+LightGBM 2%, and the seasonal naive reports the same 108.13 twice.
+
+Every MASE nonetheless falls by roughly half, the seasonal naive's included. Its forecasts
+did not change and could not have: it reads the seven observations before the cutoff, which
+the window does not touch. What changed is the denominator. MASE divides by the in-sample
+error of the seasonal naive over the training set, and over three volatile recent years
+that error is about 1.85 times what it is over the whole decade, so every ratio built on it
+shrinks.
+
+**MASE is scale-free across series, not across training windows within one series.** A
+figure of 0.621 here and 0.688 on the temperature series are not the same kind of number,
+because the two denominators are computed over different spans. Model selection is
+unaffected, since the denominator is computed once per fold and shared by every family,
+which is why the ranking by MASE and the ranking by MAE agree in both columns above and why
+SARIMA is selected either way.
+
+The window was chosen by trying three values against the same four folds the table reports,
+so 0.621 is optimistic in the way any figure is when the configuration behind it was picked
+on the data it is measured against. Isolating that would need a validation split held out
+from these folds, which at four folds per series this project does not have.
+
+## Car sales
 
 On this series no family improves on the seasonal naive:
 
@@ -70,47 +146,59 @@ On this series no family improves on the seasonal naive:
 | lightgbm | 1.130 | 1,801.69 |
 | sarima | 1.306 | 2,086.20 |
 
-Measured on the final twelve months alone the ordering inverts: Prophet leads at
-0.866 and the seasonal naive comes last at 1.270. Averaging over four folds is what
-separates a model from a favourable window.
+Measured on the final twelve months alone the ordering inverts: Prophet leads at 0.866 and
+the seasonal naive comes last at 1.270. Averaging over four folds is what separates a model
+from a favourable window.
 
-### Interval calibration
+## Interval calibration
 
 Nominal interval width is 80%. Observed coverage across models and series:
 
 | Model | Coverage range |
 |---|---|
-| sarima | 56% to 80% |
+| sarima | 56% to 91% |
 | seasonal_naive | 71% to 100% |
-| prophet | 40% to 80% |
+| prophet | 40% to 96% |
 | lightgbm | 35% to 55% |
 
-LightGBM under-covers on every series. Its intervals come from quantile regression
-at 0.1 and 0.9 evaluated at each recursive step, and that procedure does not
-accumulate the uncertainty introduced by feeding predicted values back into the lag
-features. SARIMA, whose intervals derive from the state-space model variance,
-tracks the nominal level most closely.
+LightGBM under-covers on every series. Its intervals come from quantile regression at 0.1
+and 0.9 evaluated at each recursive step, and that procedure does not accumulate the
+uncertainty introduced by feeding predicted values back into the lag features. SARIMA,
+whose intervals derive from the state-space model variance, tracks the nominal level most
+closely.
+
+## Choice of error metric
+
+The series span four orders of magnitude, from single-digit temperatures to car sales in
+the tens of thousands, and two of them contain values below 1.0: sunspots reach 0.20 and
+temperatures 0.50. A five-unit error against an observation of 0.20 registers as 2,500%,
+which would dominate any average containing it. MASE divides by the in-sample mean absolute
+error of the seasonal naive, giving a figure where 1.0 matches that baseline, with the
+qualification above about what happens when the training set is windowed.
 
 ## Architecture
 
-```mermaid
-flowchart LR
-    SRC[("Published CSV series")] --> ING["ingest<br/>parse, clean, store"]
-    ING --> DB[("PostgreSQL<br/>series, observations, evaluations")]
-    DB --> BT["backtest<br/>rolling origin, 4 families"]
-    BT --> DB
-    DB --> API["FastAPI<br/>/series, /evaluation, /forecast"]
-    DB --> UI["Streamlit dashboard"]
-```
+Ingestion and backtesting are a batch job that writes to the database; the dashboard and
+the API read from it. Two sources feed ingestion, published CSVs over HTTP and the energy
+warehouse over PostgreSQL, and both arrive as the same two columns before anything else
+sees them.
 
-Ingestion and backtesting run as a batch job that writes to the database. The
-dashboard and the API read from it. Series metadata travels with the stored series
-rather than being read from the source registry at serving time, so both consumers
-depend on the database alone.
+Series metadata travels with the stored series rather than being read from the source
+registry at serving time, so both consumers depend on the database alone. The training
+window is part of that metadata: fitting on the full history at serving time would serve a
+model whose accuracy nothing measured, so the same window the backtest scored is the one
+the served fit uses.
+
+The batch job accepts a single series, which is what makes rescoring one of them a
+thirty-second operation rather than a refetch of 93,504 rows and a refit of the other six.
 
 ## Testing
 
-60 tests at 95% coverage of the application packages. The suite runs offline:
-series are read from fixtures rather than downloaded, models are fitted on a
-60-point synthetic series, and the database is a temporary SQLite file. CI
+79 tests at 94% coverage of the application packages. The suite runs offline: series are
+read from fixtures rather than downloaded, the warehouse is never connected to, models are
+fitted on a 60-point synthetic series, and the database is a temporary SQLite file. CI
 additionally applies the migrations against a PostgreSQL service container.
+
+Which fold trained on how much is not observable from outside the backtest, and it is the
+property the training window exists to control, so a stand-in model family records the size
+of every frame it is fitted on and the tests assert the window from that.

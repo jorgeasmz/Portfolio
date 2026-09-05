@@ -77,8 +77,15 @@ describe("the project content directory", () => {
     expect(() => getProjectBySlug("no-such-project")).toThrow();
   });
 
-  it("leads with the retrieval work", () => {
-    expect(getAllProjects()[0].slug).toBe("research-copilot");
+  it("orders by the explicit position, ascending", () => {
+    const positions = getAllProjects().map((p) => p.order ?? Number.MAX_SAFE_INTEGER);
+
+    expect(positions).toEqual([...positions].sort((a, b) => a - b));
+  });
+
+  // The lead is a choice, not a property, so changing it should mean changing this.
+  it("leads with the platform work", () => {
+    expect(getAllProjects()[0].slug).toBe("ml-platform");
   });
 
   it("returns only featured projects, capped", () => {

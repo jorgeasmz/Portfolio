@@ -1,0 +1,240 @@
+---
+title: "ML Platform"
+summary: "Operates the models the other projects train: it decides which version is in production, refuses to serve one whose artifact cannot be trusted to load, and blocks a promotion that is not an improvement on the version it would replace."
+image: "/images/projects/ml-platform-bg.png"
+techStack: ["Python", "MLflow", "Kubernetes", "Helm", "Docker", "PostgreSQL", "Hugging Face", "GitHub Actions"]
+demoUrl: "https://jorgeasmz.github.io/ML-Platform/"
+repoUrl: "https://github.com/jorgeasmz/ML-Platform"
+date: "2026-09-05"
+featured: true
+order: 1
+---
+
+## Model catalogue
+
+The platform fits no models of its own. It operates two that other projects train, and
+they differ in every way that a registry designed around one of them would have got
+wrong.
+
+| Model | Metric | Direction | Artifact |
+|---|---|---|---|
+| `credit-risk` | `total_cost` | lower | one pickled scikit-learn pipeline |
+| `irony` | `f1_ironic` | higher | a repository of ONNX graphs and a tokeniser |
+
+A registered model names the metric its promotion turns on, the direction that improves
+it, and the libraries whose version has to match for its artifact to load at all.
+Promoting on a quantity other than the recorded one is not expressible.
+
+Credit risk promotes on the expected loss under its dataset's own cost matrix, where a
+missed default costs five times a rejected good applicant. That project also reports
+accuracy and ROC-AUC, and neither is what the decision is worth.
+
+## Artifact storage
+
+MLflow keeps runs, parameters and metrics in a database and artifacts wherever the
+artifact root points. Every backend it ships with is either object storage that bills or
+a filesystem a free host does not keep across restarts, so the model binaries are the one
+part of a registry with nowhere durable to live.
+
+This project registers an `hf` URI scheme whose artifacts are Hugging Face model
+repositories, discovered through MLflow's `mlflow.artifact_repository` entry point. A URI
+is `hf://owner/repo`, optionally pinned with `?revision=`.
+
+A pinned URI refuses writes. A commit names bytes that already exist, and the way to add
+to a pinned artifact is to write through the branch and pin the commit that comes back.
+
+## Environment record
+
+A fitted estimator saved with pickle carries no record of what wrote it, and the
+libraries that write it do not promise that a later version reads it correctly. The
+failure is not an exception. An estimator can unpickle under a version that reconstructs
+it differently and then predict, quietly, something else.
+
+| Difference | Behaviour |
+|---|---|
+| Major or minor moved | Load fails, naming every package and both versions |
+| Patch moved, package declared exact | Load fails |
+| Patch moved, package not declared exact | Reported, load proceeds |
+| Package absent | Load fails |
+
+Which packages are declared exact is a property of the model rather than a global
+setting. `scikit-learn` documents no guarantee that a pickled estimator loads correctly
+under another version, so the model that carries one declares it; weights loaded from a
+format versioned in itself do not need the same rule.
+
+## Promotion gate
+
+The comparison a gate exists to make is only meaningful when both numbers describe the
+same thing, so the gate establishes that before it compares anything.
+
+| Condition | Outcome |
+|---|---|
+| The candidate reports a metric the model does not promote on | Held |
+| The candidate does not clear the model's floor | Held |
+| Nothing is in production | Promoted |
+| **The two were measured on different held-out data** | **Held, as incomparable** |
+| The candidate does not improve on the incumbent | Held |
+| The candidate improves on the incumbent, on the same data | Promoted |
+
+The fourth row is what separates a gate from a comparison of two numbers. A candidate
+scored on data the incumbent was never scored against is unjudged, and the answer is to
+score the incumbent on that data rather than to promote on an incomparable pair. A test
+fixes the awkward case: a candidate that looks *worse* on other data is refused as
+incomparable rather than accepted as worse.
+
+A tie is held. An equal candidate is a redeploy with no measured reason behind it. The
+retraining that runs on every change to how the model is built is deterministic, so it
+produces the same score and the gate declines it, which is the steady state and the
+correct one.
+
+The candidate is registered whichever way the gate decides. A refused version stays in
+the registry carrying the score that refused it.
+
+## What a refusal blocks
+
+The gate's exit status is its answer: 0 promotes, 1 holds. A workflow step can therefore
+fail on a candidate that is not an improvement without understanding the metric or
+reading the registry.
+
+A candidate that does not improve is an ordinary outcome rather than a failure, so the
+run stays green and withholds the pointer instead. Without the pointer there is no
+commit, and without the commit there is no deployment. That is the whole of the block: a
+promotion opens a pull request whose diff is the pointer, and merging it is the release.
+
+## Resolving what serves
+
+A build that trains ships a model that nothing measured and nothing compared against the
+one it replaces, and it fails whenever the dataset's host is down. The serving image
+instead reads a pointer naming the version the registry promoted and downloads exactly
+the bytes that were scored, addressed by the commit they live at.
+
+The pointer holds no credential and the repository is public, so no registry credential
+enters a Docker build, where it would persist in the layer history. The environment
+record travels in the pointer, and the image refuses to build under library versions that
+could reconstruct the estimator differently.
+
+Verified end to end: the artifact loaded inside the built image hashes to `4d17fdeb3b1d`,
+the same digest the registry recorded when the gate scored it, and the deployed API
+reports that same version to every caller.
+
+## Serving on Kubernetes
+
+One chart parameterised by model and image rather than manifests per service, so a second
+model is a values file rather than a copy.
+
+The two probes ask different questions because the service answers them differently on
+purpose: its root endpoint returns 200 even when the model failed to load, which keeps a
+bad artifact from becoming a restart loop. Liveness reads the status; readiness reads the
+body and asserts that a model is loaded.
+
+`helm lint` and a rendered template establish that the YAML is valid, which a manifest
+that crash-loops also is. So the workflow builds the real image, loads it into a `kind`
+cluster and asks the cluster what a rendering cannot answer.
+
+| Question | How it is answered |
+|---|---|
+| Does the pod start | `rollout status`, which fails on a crash loop |
+| Does readiness pass | The rollout does not complete until it does |
+| Does the Service route | A port-forward and a request through it |
+| Which model is served | The response carries the artifact hash |
+| Can the autoscaler read the workload | metrics-server is installed and the HPA polled for a utilisation |
+
+The last row is the difference between an autoscaler that exists and one that reads its
+target: with metrics-server the HPA reports `cpu: 29%/70%` rather than `unknown`.
+
+Starting is not operating, so two more questions are asked of the same cluster, and both
+fail the job when the answer is wrong.
+
+| Property | Measured |
+|---|---|
+| The autoscaler adds a replica under load | 1 to 2 replicas after 50 s, at 110% of the 70% target |
+| A rolling update drops nothing | 14,614 requests through a full pod replacement, 0 failed |
+
+The second was measured with the drain pause disabled as well, and dropped nothing either.
+On one node the endpoint removal propagates before it matters. The pause stays because the
+window it covers widens with the number of nodes the change has to reach, which a
+single-node cluster cannot produce; claiming it is why the test passes would be claiming
+something the measurement does not show.
+
+No cluster serves public traffic, and none is planned. There is no managed Kubernetes on a
+free tier without a card. The one provider whose free tier includes it had no Ampere
+capacity in the region, and its terms reclaim an idle instance after seven days below 20%
+utilisation, which is the exact profile of a demo nobody visits. A dead URL is worse than
+an absent one.
+
+What that costs is a public address served from Kubernetes and anything about running a
+cluster over weeks. What it keeps is every property above, asserted on every change to the
+manifests.
+
+## Input drift
+
+A model is fitted on one population and asked about whatever arrives. Nothing in the
+serving path notices when those stop being the same, and the accuracy that justified the
+promotion was measured on the first one.
+
+The measure is the population stability index, whose thresholds are the conventional ones
+from credit scoring: below 0.1 no meaningful shift, above 0.25 significant. Buckets come
+from the reference rather than from the combined sample, since buckets that followed the
+new data would absorb the movement being measured.
+
+Measured against samples whose shift is known:
+
+| Sample | Rows | Worst column | Columns above 0.25 |
+|---|---:|---|---:|
+| Held-out split, same population | 200 | `purpose` 0.073 | **0 of 20** |
+| Above-median duration | 91 | `duration` 3.512 | 3 of 20 |
+| Top quartile of amount | 50 | `amount` 5.935 | 6 of 20 |
+
+The first row is the one that matters: across twenty columns, data from the same
+population raises nothing. The third reports six columns for one filter, because amount,
+duration and age move together, and a monitor reporting only the filtered column would be
+missing what the shift did to the population.
+
+The production decision log holds one scored application, so the monitor reports that and
+compares nothing. Below a hundred rows it declines rather than dressing a handful up as a
+distribution. The figures above measure the instrument, not production.
+
+Evidently would compute this and more. It requires `plotly` below 6 and the service being
+watched pins `plotly` 7, so installing it would mean downgrading the dashboard of the
+thing being monitored.
+
+## Sizing
+
+The tracking server starts a job subsystem with a process pool and two periodic tasks,
+online scoring and trace archival, neither of which this platform uses.
+
+| `MLFLOW_SERVER_ENABLE_JOB_EXECUTION` | Processes over 20 MB | Summed PSS |
+|---|---:|---:|
+| `true`, the default | 10 | 1,758 MB |
+| **`false`** | **2** | **379 MB** |
+
+Measured over the whole process tree, because the pool is forked and neither its
+processes nor their memory appear in the parent. A figure counting only the processes
+whose command line matches the server reports 195 MB for a deployment that is killed
+during start-up on a 512 MB plan.
+
+The serving image excludes the host virtualenv from its build context, which is 1.1 GB of
+another machine's paths: 1.49 GB against 3.01 GB, and 728 KB of application against 1.2 GB.
+
+## Access
+
+The tracking server requires a credential on every route but its health check. It is not
+published with a browse credential, because MLflow's basic auth gates reading and editing
+a resource but not creating one: with workspaces disabled, which is the default, any
+authenticated user can create registered models whatever their permission. A published
+read-only credential would also be a credential that can write.
+
+What is published instead is a static page built from the registry by a workflow that
+holds the credential, carrying which version of each model serves and the evidence behind
+it, in one file with no stylesheet, no script and nothing that can be written to.
+
+## Testing
+
+A hundred and sixteen tests offline, and none reaches the network. The hub client is a double that
+records what would have been uploaded; the installed-version lookup is a mapping, with one
+test exercising the real lookup so the doubles cannot pass against code that never worked.
+
+The registry, the gate and the resolver run against a real MLflow registry backed by a
+temporary SQLite file rather than against a double, so an API that moves under the project
+fails there rather than in deployment. That has already earned its keep: it is how the
+`hf://` scheme was confirmed to survive being stored as a model version's source.

@@ -8,6 +8,9 @@ import { Reveal } from "@/components/animations/Reveal";
 import { FadeIn } from "@/components/animations/FadeIn";
 import { QuantumBackground } from "@/components/animations/QuantumBackground";
 import Image from "next/image";
+// Imported rather than referenced by path: that is what lets the build
+// generate the blurred placeholder the circle shows while it loads.
+import avatar from "@/public/images/avatar.jpg";
 
 export default function Home() {
   // Selection is explicit in each file's front matter, not a side effect of dates.
@@ -101,11 +104,13 @@ export default function Home() {
                         
                         {/* Image Container */}
                         <div className="relative h-full w-full overflow-hidden rounded-full border-4 border-background shadow-2xl z-10">
-                            <Image 
-                                src="/images/avatar.jpg" 
-                                alt="Jorge's Avatar"
+                            <Image
+                                src={avatar}
+                                alt="Jorge Arias"
                                 fill
                                 className="object-cover"
+                                sizes="(max-width: 768px) 16rem, (max-width: 1024px) 20rem, 24rem"
+                                placeholder="blur"
                                 priority
                             />
                         </div>

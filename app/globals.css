@@ -86,3 +86,33 @@
     border-color: var(--color-border);
   }
 }
+/* A band that travels across a surface with nothing on it yet. It sits behind the
+   image it stands in for, so the image covers it by loading rather than by any
+   state being tracked, and no JavaScript runs. */
+@keyframes shimmer {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(100%); }
+}
+
+.shimmer::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    hsl(var(--muted-foreground) / 0.10),
+    transparent
+  );
+  /* Bounded rather than infinite: once the image has painted the band is covered
+     but still composited, and an image that has not arrived in fourteen seconds
+     is not going to be explained by a moving highlight. */
+  animation: shimmer 1.8s ease-in-out 8;
+}
+
+/* Motion is decoration here: the surface still reads as pending without it. */
+@media (prefers-reduced-motion: reduce) {
+  .shimmer::after {
+    animation: none;
+  }
+}

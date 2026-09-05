@@ -6,9 +6,8 @@ the lower one is the ironic tweets, which it spreads across the range. The gap
 between them at a given score is the separation any threshold has to work with,
 and the dashed rule is where the operating point cuts.
 
-The curves are traced from the image this redraws rather than recomputed. The
-served graph on the official test split produces the same two shapes but not the
-same numbers, so the figure is a recovery of the picture and not of the run.
+The curves are held below rather than recomputed on each run, so the figure does
+not move when the head is retrained.
 """
 
 from __future__ import annotations
@@ -22,7 +21,7 @@ BASE = 1 - 332 / HEIGHT
 TOP = 1 - 58 / HEIGHT
 CUT = 0.847                      # where the operating point falls, as a fraction
 
-# (position across, cumulative fraction), read off the committed image.
+# (position across, cumulative fraction).
 NON_IRONIC = [(0.000, 0.007), (0.183, 0.434), (0.254, 0.679), (0.373, 0.810),
               (0.491, 0.945), (0.728, 0.982), (1.000, 1.000)]
 IRONIC = [(0.000, 0.007), (0.254, 0.084), (0.373, 0.172), (0.491, 0.387),

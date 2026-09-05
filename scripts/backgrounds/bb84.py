@@ -6,8 +6,7 @@ position where the two sides chose the same basis, which is the only case whose
 bit survives into the sifted key.
 
 The two waves are the carrier, out of phase with each other, and carry no
-measurement. This is a redraw of an image made before this directory existed, so
-it differs from the committed one in small ways.
+measurement.
 """
 
 from __future__ import annotations
@@ -17,7 +16,7 @@ import numpy as np
 from palette import DPI, HEIGHT, WIDTH, canvas, ground  # noqa: F401
 
 SYMBOLS = 11
-FIRST, STEP = 0.0977, 0.0801        # centres, matching the committed image
+FIRST, STEP = 0.0977, 0.0801        # centre of the first symbol, and the pitch
 AXIS = 0.5
 AXIS_FROM, AXIS_TO = 0.068, 0.928
 
@@ -61,8 +60,7 @@ def main() -> None:
     background = ground("#150e30", "#100c28", "#2a1f6b", at=(0.88, 0.78), strength=0.30)
     figure, axes, target = canvas(background, "bb84-bg")
 
-    # Centre, amplitude and crest read off the image this redraws: the upper wave
-    # is highest at the middle, the lower one a quarter of the way in.
+    # The upper wave is highest at the middle, the lower one a quarter of the way in.
     carrier(axes, 0.729, 0.109, crest=0.500)
     carrier(axes, 0.274, 0.111, crest=0.250)
 

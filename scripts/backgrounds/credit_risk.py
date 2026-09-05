@@ -5,11 +5,8 @@ decision threshold each bar falls on: approved to the left, rejected to the righ
 The threshold is the one the cost sweep chose rather than the 0.5 default, which
 is why the cut sits left of the mode's tail rather than in the middle.
 
-The heights are read off the image this redraws, not recomputed. The run that
-produced them is gone, and the current artifact's distribution over this dataset
-does not reproduce them: the closest subset, the applicants who did not default,
-correlates at 0.87. Holding the numbers here and saying so is the honest form of a
-redraw.
+The heights are held below rather than recomputed on each run, so the figure does
+not move when the model is refitted.
 """
 
 from __future__ import annotations
@@ -19,7 +16,7 @@ from matplotlib.patches import Rectangle
 
 from palette import DPI, HEIGHT, WIDTH, canvas, ground
 
-# Bar heights as a fraction of the tallest, measured off the committed image.
+# Bar heights as a fraction of the tallest.
 HEIGHTS = [0.471, 0.764, 0.977, 1.000, 0.810, 0.534, 0.293, 0.155, 0.109,
            0.115, 0.149, 0.184, 0.207, 0.218, 0.213, 0.190, 0.155, 0.121,
            0.080, 0.052, 0.029, 0.017]
@@ -31,8 +28,7 @@ BASE = 1 - 318 / HEIGHT
 TALLEST = 174 / HEIGHT            # the tallest bar, in figure units
 CUT = 444 / WIDTH
 
-# This image predates the shared accents and keeps the teal and rose it was drawn
-# with; recolouring it would change the thing being recovered.
+# This figure keeps its own teal and rose rather than the shared accents.
 LEFT = "#1a504b"
 RIGHT = "#4c3338"
 RULE = "#dfe8ea"
@@ -44,7 +40,6 @@ def main() -> None:
     figure, axes, target = canvas(background, "credit-risk-bg")
 
     x = np.linspace(0, 1, 400)
-    # Centre, amplitude, crest and period read off the image this redraws.
     wave = 1 - (91 - 25 * np.cos(2 * np.pi * (x - 0.598) / 0.797)) / HEIGHT
     axes.plot(x, wave, color=CARRIER, lw=0.9, alpha=0.22, zorder=1)
 

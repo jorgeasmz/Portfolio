@@ -2,7 +2,7 @@
 title: "Credit Risk Assessment System"
 summary: "A credit scoring API with per-field SHAP explanations, an auditable decision log in PostgreSQL and an outcome endpoint for measuring realised cost."
 image: "/images/projects/credit-risk-bg.png"
-techStack: ["Python", "FastAPI", "scikit-learn", "PostgreSQL", "Docker", "pandas"]
+techStack: ["Python", "FastAPI", "scikit-learn", "SHAP", "PostgreSQL", "Docker", "Hugging Face"]
 demoUrl: "https://jorgeasmz-credit-risk-assessment.streamlit.app/"
 repoUrl: "https://github.com/jorgeasmz/Credit-Risk-Assessment"
 date: "2024-04-10"
@@ -103,18 +103,55 @@ with a constant-time function. When no key is configured the endpoints return 50
 accepting unauthenticated requests. A single shared key covers service-to-service access; per
 client keys, rotation and rate limiting would be required for multiple consumers.
 
+## Where the model comes from
+
+The image does not fit a model. A build that trains ships one that nothing measured and
+nothing compared against what it replaces, and it fails whenever the dataset's host is down.
+
+What is committed is a pointer naming the version a registry promoted, the commit its artifact
+lives at, and the expected loss that justified it. The build downloads exactly those bytes over
+public HTTPS, so no registry credential enters a Docker layer, and refuses to proceed under
+library versions that could reconstruct the estimator differently.
+
+A candidate is promoted only when it beats the version in production on expected loss, measured
+on the same held-out rows. Promotion writes the pointer; merging that commit is the deployment.
+The artifact loaded inside the built image hashes to `4d17fdeb3b1d`, the same digest recorded
+when the candidate was scored, and the running API reports that version to every caller.
+
+## Input drift
+
+The model was fitted on one population and is asked about whatever arrives. A weekly comparison
+of the decision log against the training split reports, per column, the population stability
+index, whose conventional threshold for a significant shift is 0.25.
+
+| Sample | Rows | Worst column | Columns above 0.25 |
+|---|---:|---|---:|
+| The held-out split, same population | 200 | `purpose` 0.073 | **0 of 20** |
+| Above-median duration | 91 | `duration` 3.512 | 3 of 20 |
+| Top quartile of amount | 50 | `amount` 5.935 | 6 of 20 |
+
+Those measure the instrument. The decision log holds one scored application, so the comparison
+declines to run: below a hundred rows a handful is not a distribution. The run exits non-zero
+when a column moves, which fails the scheduled job and sends a notification, because drift
+written into a summary nobody opens is not an alert.
+
 ## Deployment
 
-The API runs as a Docker container on Render, PostgreSQL is hosted on Neon and the Streamlit
-client on Streamlit Cloud. Alembic migrations execute at container start rather than at image
-build, since the database is not reachable while the image is being built.
+The API runs as a Docker container on Render, with its PostgreSQL instance and API key declared
+in the same blueprint, and the Streamlit client on Streamlit Cloud. Alembic migrations execute
+at container start rather than at image build, since the database is not reachable while the
+image is being built.
 
 Both free tiers suspend on inactivity. A measured cold start returned the health check in 32
 seconds, and the client timeout is set to 90 seconds.
 
+The build context excludes the host virtualenv, which is 1.1 GB of another machine's paths:
+the image is 1.49 GB against 3.01 GB without that exclusion, and 728 KB of application against
+1.2 GB.
+
 ## Testing
 
-The suite contains 68 tests at 96% statement coverage of the application and model packages.
+The suite contains 103 tests at 90% statement coverage of the application and model packages.
 Tests fit the pipeline on a synthetic frame following the production schema and run against a
 temporary SQLite database, so neither network access nor an external database is required. CI
 additionally applies the migrations against a PostgreSQL service container to detect dialect

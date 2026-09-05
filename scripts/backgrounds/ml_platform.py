@@ -1,76 +1,68 @@
-"""ML Platform: what the drift monitor says on data whose shift is known.
+"""ML Platform: candidates arriving at a gate, and the one that passes it.
 
-Twenty columns of credit applications, ordered by how far they moved. The upper
-row is the held-out split, drawn from the same population the model was fitted
-on; the lower row is the top quartile of loan amount. The rule is 0.25, the
-conventional threshold above which a population stability index counts as a
-significant shift.
+Every other image in this set states a measured result. This one does not, and the
+reason is that what characterises this project is a behaviour rather than a
+distribution: a candidate is compared against the version in production and is
+refused unless it improves on it, so almost everything stops and one thing
+continues. A plot of the versions registered so far would be a figure of five
+points; the shape of the rule is the more honest subject.
 
-Nothing crosses the rule above. Three columns cross it below, and the first of
-them is the one that was filtered. The measure is logarithmic because the largest
-index is 5.93 and the smallest is zero.
+Fifteen paths converge on the gate. Fourteen end there. The one that passes leaves
+along the axis the whole figure is mirrored about.
 """
 
 from __future__ import annotations
 
 import numpy as np
 
-from palette import DPI, HIT, MUTED, RULE, canvas, ground
+from palette import DPI, HIT, canvas, ground
 
-# Population stability index per column, ordered by the shifted case.
-SAME = [0.0405, 0.0064, 0.0725, 0.0727, 0.0109, 0.0009, 0.0144, 0.0477, 0.0138,
-        0.0138, 0.0263, 0.0002, 0.0159, 0.0005, 0.0370, 0.0005, 0.0021, 0.0023,
-        0.0033, 0.0000]
-SHIFTED = [5.9349, 1.6781, 0.8768, 0.4970, 0.2691, 0.2678, 0.1667, 0.1640, 0.1383,
-           0.1217, 0.0884, 0.0789, 0.0723, 0.0523, 0.0325, 0.0324, 0.0284, 0.0128,
-           0.0122, 0.0000]
+PATHS = 15                    # odd, so one of them is the axis
+ENTRY, GATE, EXIT = 0.05, 0.63, 0.95
+SPREAD = 0.42                 # half the height the paths enter across
+THROAT = 0.10                 # half the height they converge into
+STOP = 0.035                  # gap a refused path leaves before the gate
+MIDDLE = 0.5
 
-SIGNIFICANT = 0.25
-FLOOR = 0.0008           # below this a bar would have no height to draw
-CEILING = 8.0
-
-LEFT, RIGHT = 0.06, 0.94
-BASE_TOP, BASE_BOTTOM = 0.55, 0.06     # the two rows sit on these baselines
-HEIGHT = 0.36
-
-
-def scaled(value: float) -> float:
-    """Log height, since the indices span four orders of magnitude."""
-    value = max(value, FLOOR)
-    span = np.log10(CEILING / FLOOR)
-    return float(np.log10(value / FLOOR) / span)
-
-
-def row(axes, baseline: float, values: list[float], colour_above: str) -> None:
-    step = (RIGHT - LEFT) / len(values)
-    width = step * 0.62
-    for index, value in enumerate(values):
-        x = LEFT + index * step + (step - width) / 2
-        height = scaled(value) * HEIGHT
-        crossed = value >= SIGNIFICANT
-        axes.add_patch(plt_rect(
-            (x, baseline), width, height,
-            colour_above if crossed else MUTED,
-            0.92 if crossed else 0.40,
-        ))
-    rule = baseline + scaled(SIGNIFICANT) * HEIGHT
-    axes.plot([LEFT - 0.02, RIGHT + 0.02], [rule, rule], color=RULE, lw=0.9,
-              alpha=0.30, zorder=4)
-
-
-def plt_rect(xy, width, height, colour, alpha):
-    from matplotlib.patches import Rectangle
-
-    return Rectangle(xy, width, height, facecolor=colour, alpha=alpha,
-                     edgecolor="none", zorder=3)
+REFUSED = "#9c8494"
+PASSED = HIT
 
 
 def main() -> None:
-    background = ground("#120610", "#25101f", "#7d1f52", at=(0.24, 0.34), strength=0.28)
+    background = ground("#120610", "#25101f", "#7d1f52", at=(0.62, 0.5), strength=0.30)
     figure, axes, target = canvas(background, "ml-platform-bg")
 
-    row(axes, BASE_TOP, SAME, HIT)
-    row(axes, BASE_BOTTOM, SHIFTED, HIT)
+    steps = np.linspace(0, 1, 240)
+    # Smoothstep, so a path leaves and arrives horizontally rather than at an angle.
+    eased = steps * steps * (3 - 2 * steps)
+
+    for offset in np.linspace(-1, 1, PATHS):
+        centre = abs(offset) < 1e-9
+        # A refused path stops short of the gate. The one that passes reaches it.
+        finish = GATE if centre else GATE - STOP
+        across = ENTRY + (finish - ENTRY) * steps
+        start = MIDDLE + offset * SPREAD
+        down = start + (MIDDLE + offset * THROAT - start) * eased
+
+        axes.plot(
+            across, down,
+            color=PASSED if centre else REFUSED,
+            lw=2.2 if centre else 1.0,
+            # The candidate arrives no brighter than the others; what it earns is
+            # the far side.
+            alpha=0.55 if centre else 0.28,
+            solid_capstyle="round",
+            zorder=4 if centre else 2,
+        )
+
+    # The gate itself: the one place every path has to reach the same conclusion.
+    axes.plot([GATE, GATE], [MIDDLE - THROAT - 0.16, MIDDLE + THROAT + 0.16],
+              color="#efe2ea", lw=1.3, alpha=0.42, zorder=5)
+
+    # What passes it continues, and nothing else does.
+    axes.plot([GATE, EXIT], [MIDDLE, MIDDLE], color=PASSED, lw=2.6, alpha=0.95,
+              solid_capstyle="round", zorder=6)
+    axes.plot(EXIT, MIDDLE, "o", ms=7.0, color=PASSED, alpha=0.95, zorder=7)
 
     figure.savefig(target, dpi=DPI, facecolor="#120610")
     print(target)

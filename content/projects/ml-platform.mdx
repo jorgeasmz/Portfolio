@@ -156,16 +156,6 @@ window it covers widens with the number of nodes the change has to reach, which 
 single-node cluster cannot produce; claiming it is why the test passes would be claiming
 something the measurement does not show.
 
-No cluster serves public traffic, and none is planned. There is no managed Kubernetes on a
-free tier without a card. The one provider whose free tier includes it had no Ampere
-capacity in the region, and its terms reclaim an idle instance after seven days below 20%
-utilisation, which is the exact profile of a demo nobody visits. A dead URL is worse than
-an absent one.
-
-What that costs is a public address served from Kubernetes and anything about running a
-cluster over weeks. What it keeps is every property above, asserted on every change to the
-manifests.
-
 ## Input drift
 
 A model is fitted on one population and asked about whatever arrives. Nothing in the

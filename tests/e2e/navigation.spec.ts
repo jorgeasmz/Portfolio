@@ -7,7 +7,7 @@ const PROJECT_COUNT = readdirSync("content/projects").filter((file) =>
   file.endsWith(".mdx")
 ).length;
 
-test("the landing page leads with the retrieval project", async ({ page }) => {
+test("the landing page leads with the platform project", async ({ page }) => {
   await page.goto("/");
 
   await expect(page.getByRole("heading", { level: 1 })).toContainText(
@@ -15,15 +15,15 @@ test("the landing page leads with the retrieval project", async ({ page }) => {
   );
 
   const featured = page.locator("#projects").getByRole("heading", { level: 3 });
-  await expect(featured.first()).toContainText("Research Copilot");
+  await expect(featured.first()).toContainText("ML Platform");
 });
 
-test("every project is listed, with the retrieval one first", async ({ page }) => {
+test("every project is listed, with the platform one first", async ({ page }) => {
   await page.goto("/projects");
 
   const titles = page.getByRole("heading", { level: 3 });
   await expect(titles).toHaveCount(PROJECT_COUNT);
-  await expect(titles.first()).toContainText("Research Copilot");
+  await expect(titles.first()).toContainText("ML Platform");
 });
 
 test("a card opens its project page", async ({ page }) => {

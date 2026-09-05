@@ -17,6 +17,8 @@ export function ProjectCard({ project, from }: ProjectCardProps) {
     <div className="group relative flex h-full flex-col overflow-hidden rounded-xl border border-border bg-card text-card-foreground transition-all hover:border-primary/50 hover:shadow-lg">
 
       <div className="relative h-48 w-full overflow-hidden border-b border-border bg-muted/20 text-muted-foreground">
+        {/* Behind the image, so it is covered the moment the image paints. */}
+        <div className="shimmer absolute inset-0" aria-hidden="true" />
         {project.image ? (
           <Image
             src={project.image}

@@ -21,16 +21,16 @@ export default function OpengraphImage() {
       >
         <div
           style={{
-            width: 300,
-            height: 300,
+            width: 470,
+            height: 470,
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
             background: "linear-gradient(140deg, #1e293b 0%, #0f172a 100%)",
             borderRadius: "22%",
-            fontSize: 180,
+            fontSize: 280,
             fontWeight: 700,
-            letterSpacing: -10,
+            letterSpacing: -16,
           }}
         >
           <span style={{ color: "#f8fafc" }}>J</span>

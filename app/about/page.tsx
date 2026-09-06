@@ -16,9 +16,9 @@ const HISTORY: Role[] = [
     place: "Lethbridge, Canada",
     points: [
       "Research work entitled “Quantum Accelerated Approximation Algorithms”.",
-      "Implementation and simulation of quantum algorithms including the SWAP Test and VQLS.",
-      "Noise models to run those algorithms under realistic hardware conditions.",
-      "Neural networks and support vector machines applied to denoising the resulting data.",
+      "Implemented quantum algorithms including the SWAP Test and VQLS, and simulated them on local devices.",
+      "Ran those simulations under noise models to evaluate the algorithms in realistic conditions.",
+      "Applied neural networks and support vector machines to denoise the resulting data.",
     ],
   },
   {
@@ -28,9 +28,9 @@ const HISTORY: Role[] = [
     place: "Cali, Colombia",
     points: [
       "Research work entitled “Use of Decoy States for Increasing Security in a Quantum Key Distribution Protocol”.",
-      "FPGA programmed as the photon counting electronics of an optical setup.",
-      "Simulation of the BB84 protocol, and of BB84 with vacuum and weak decoy states.",
-      "Implementation of the optical setup in the Optics and Quantum Information Laboratory.",
+      "Simulated the BB84 protocol, and BB84 with vacuum and weak decoy states.",
+      "Programmed an FPGA as the photon counting electronics of an optical setup.",
+      "Assembled the optical setup in the Optics and Quantum Information Laboratory.",
     ],
   },
   {
@@ -85,16 +85,15 @@ export default function AboutPage() {
 
       <div className="prose prose-lg prose-invert text-muted-foreground">
         <p>
-          I am a software engineer from Cali, Colombia. I finished my degree in Systems
+          I am a Software Engineer from Cali, Colombia. I finished my degree in Systems
           Engineering at Universidad del Valle in November 2025, having started a second one in
           Physics there two years before finishing the first, which I expect to complete in
           2027.
         </p>
         <p>
-          The two have never been separate in practice. My work is in machine learning systems
-          and in the engineering that keeps them running once they are deployed, and my
-          research is in quantum information, where the measurements have more than once turned
-          out to need the same tools.
+          I work across software and physics. On the software side, machine learning and
+          everything that has to hold around it. On the physics side, quantum information, in
+          simulation and on an optical bench.
         </p>
 
         <h2 className="text-foreground mt-12 mb-6">Experience and education</h2>
@@ -122,26 +121,25 @@ export default function AboutPage() {
           ))}
         </ul>
 
-        <h2 className="text-foreground mt-12 mb-6">Current focus</h2>
+        <h2 className="text-foreground mt-12 mb-6">Engineering</h2>
         <p>
-          What holds my attention is the part of a system that only appears once it is running.
-          A trained model is a small piece next to the service that has to hold a memory
-          budget, the features that must come out identical whether a pipeline or a live stream
-          produced them, and the threshold that quietly stops meaning what it meant when it was
-          set.
+          Most of a machine learning system is not the model. The service has to fit a memory
+          budget, the features have to come out identical whether a pipeline or a live stream
+          produced them, and the threshold stops meaning what it meant on the day it was set.
         </p>
         <p>
-          The same concern turns up in retrieval, where an answer can only be as good as what
-          the model was handed, so most of the work sits in the retrieval itself and in tying
-          every claim back to the paragraph it came from. It turns up again wherever a decision
-          costs someone something, because scoring well and being able to show the reasons to
-          the person the decision was made about are not the same requirement.
+          Retrieval moves the same problem one step earlier. An answer is bounded by the
+          passages the model was handed, so most of my work sits in the retrieval itself and in
+          resolving every claim back to the paragraph it came from. Where a decision costs
+          someone money, the score is not the whole requirement, and the reasons have to be
+          legible to the person the decision was made about.
         </p>
+
+        <h2 className="text-foreground mt-12 mb-6">Research</h2>
         <p>
-          On the physics side it is quantum key distribution, and in particular BB84 with
-          vacuum and weak decoy states, which is the subject of my thesis. The protocol is
-          simple enough to write in an afternoon and fragile enough that real hardware breaks
-          it, and that gap is where the decoy states earn their place.
+          My research is in quantum information: key distribution protocols and quantum
+          algorithms, in simulation and on hardware. The work runs from testing under realistic
+          noise models to photon counting electronics and an optical bench.
         </p>
 
         <h2 className="text-foreground mt-12 mb-6">Technical skills</h2>

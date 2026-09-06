@@ -29,7 +29,6 @@ export const metadata: Metadata = {
     title: "Jorge Arias | Portfolio",
     description,
     url: site,
-    images: [{ url: "/images/og/ml-platform-bg.png", width: 1200, height: 630 }],
   },
   twitter: { card: "summary_large_image" },
 };

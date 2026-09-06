@@ -1,13 +1,15 @@
 """The visual language every project background shares.
 
-Each image is 1024x400, sits behind a card in a dark interface, and carries no
-text: it states the shape of one measured result and nothing else. The palette
+Each image sits behind a card in a dark interface and carries no text: it states
+the shape of one measured result and nothing else. `OG=1` redraws the same figure
+at the size a link preview needs, into `public/images/og`. The palette
 gives each project its own ground while keeping the two accents constant, so the
 set reads as one family.
 """
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 import matplotlib
@@ -18,7 +20,9 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 import numpy as np  # noqa: E402
 
-WIDTH, HEIGHT, DPI = 1024, 400, 100
+# A link preview needs 1200x630; the card behind a project wants a wider strip.
+OG = os.environ.get("OG") == "1"
+WIDTH, HEIGHT, DPI = (1200, 630, 100) if OG else (1024, 400, 100)
 
 # Green reads as the thing the project set out to catch, rose as the cost of
 # catching it. They are muted because the image is a background, not a chart.
@@ -27,7 +31,7 @@ MISS = "#b0757c"
 MUTED = "#8a7f76"
 RULE = "#d8cfc6"
 
-IMAGES = Path(__file__).resolve().parents[2] / "public" / "images" / "projects"
+IMAGES = Path(__file__).resolve().parents[2] / "public" / "images" / ("og" if OG else "projects")
 
 
 def rgb(value: str) -> np.ndarray:
@@ -57,4 +61,5 @@ def canvas(background: np.ndarray, name: str):
     axes.set_ylim(0, 1)
     axes.axis("off")
     axes.imshow(background, extent=(0, 1, 0, 1), aspect="auto", zorder=0, interpolation="bilinear")
+    IMAGES.mkdir(parents=True, exist_ok=True)
     return figure, axes, IMAGES / f"{name}.png"

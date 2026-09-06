@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { getProjectBySlug, getProjectSlugs } from "@/lib/mdx";
 import { MDXRemote } from "next-mdx-remote/rsc";
 import remarkGfm from "remark-gfm";
@@ -16,6 +17,26 @@ export const dynamicParams = false;
 type Props = {
   params: Promise<{ slug: string }>;
 };
+
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  const { slug } = await params;
+  const { metadata } = getProjectBySlug(slug);
+  // Same drawing as the card behind the project, at the size a link preview needs.
+  const image = metadata.image.replace("/images/projects/", "/images/og/");
+
+  return {
+    title: `${metadata.title} | Jorge Arias`,
+    description: metadata.summary,
+    openGraph: {
+      type: "article",
+      title: metadata.title,
+      description: metadata.summary,
+      url: `/projects/${slug}`,
+      images: [{ url: image, width: 1200, height: 630 }],
+    },
+    twitter: { card: "summary_large_image" },
+  };
+}
 
 export default async function ProjectPage({ params }: Props) {
 
